@@ -25,16 +25,16 @@ import localforecast as lf
 W, H = 960, 540
 # greys each land on one of the panel's 16 levels (multiples of 0x11)
 GREY = {"INK": "#000000", "MUTED": "#444444", "GRID": "#bbbbbb", "NIGHT": "#eeeeee",
-        "TEMP": "#000000", "COLD": "#444444", "RAIN": "#000000", "SNOW": "#999999",
+        "TEMP": "#000000", "RAIN": "#000000", "SNOW": "#999999",
         "SUN": "#555555", "WIND": "#000000", "BAND": "#cccccc", "GUST": "#000000",
-        "ROSE": "#444444", "SNOW_TEXT": "#000000", "SUN_TEXT": "#000000", "ICONS": icons.GREY,
+        "ROSE": "#444444", "ICONS": icons.GREY,
         # EAWS danger levels 1–5, light to dark; white text from level 3
         "DANGER": {1: "#eeeeee", 2: "#bbbbbb", 3: "#777777", 4: "#333333", 5: "#000000"},
         "DANGER_WHITE_FROM": 3}
 COLOUR = {"INK": "#1d1d1f", "MUTED": "#6e6e73", "GRID": "#dee2e6", "NIGHT": "#f1f3f5",
-          "TEMP": "#d9480f", "COLD": "#1c7ed6", "RAIN": "#1c7ed6", "SNOW": "#74c0fc",
+          "TEMP": "#d9480f", "RAIN": "#1c7ed6", "SNOW": "#74c0fc",
           "SUN": "#f59f00", "WIND": "#0b7285", "BAND": "#99e9f2", "GUST": "#c92a2a",
-          "ROSE": None, "SNOW_TEXT": "#1c7ed6", "SUN_TEXT": "#e8590c", "ICONS": icons.COLOUR,
+          "ROSE": None, "ICONS": icons.COLOUR,
           # official EAWS danger level colours
           "DANGER": {1: "#ccff66", 2: "#ffff00", 3: "#ff9900", 4: "#ff0000", 5: "#9e1313"},
           "DANGER_WHITE_FROM": 4}
@@ -93,7 +93,7 @@ def _temp_axis(ax, t, temp, lo=None):
     ax2.set_ylim((min(temp) if lo is None else min(min(temp), lo)) - 2, max(temp) + 2)
     ax2.yaxis.set_major_locator(plt.MaxNLocator(4, integer=True))
     ax2.yaxis.set_major_formatter(lambda v, _: f"{v:.0f}°")
-    ax2.tick_params(length=0, labelsize=12, labelcolor=P["TEMP"])
+    ax2.tick_params(length=0, labelsize=12, labelcolor=P["INK"])
     for s in ("top", "left", "right"):
         ax2.spines[s].set_visible(False)
     return ax2
@@ -107,6 +107,24 @@ def _header(fig, view, extra=""):
 
 def _label(fig, x, y, s):
     _text(fig, x, y, s.upper(), 11, P["MUTED"], weight="bold")
+
+
+def _daily(fig, days, extra):
+    """Bottom pane: one column per day with icon, min/max, sunshine and
+    either precipitation (`extra="precip"`) or estimated new snow ("snow")."""
+    w = (W - 32) / max(len(days), 1)
+    for i, d in enumerate(days):
+        x = 16 + i * w
+        day = datetime.fromisoformat(d["date"])
+        _text(fig, x + 4, 112, f"{day:%a %d}", 13, weight="bold")
+        _icon(fig, d["icon"], x, 18, 78)
+        _text(fig, x + 82, 78, f"{d['tmin']:.0f}/{d['tmax']:.0f}°", 15, weight="bold")
+        if extra == "snow":
+            _text(fig, x + 82, 54, f"❄ {d['snow_cm']:.0f} cm", 13)
+        else:
+            mm = d["precip_mm"]
+            _text(fig, x + 82, 54, f"☂ {mm:.0f} mm" if mm >= 10 or mm == 0 else f"☂ {mm:.1f} mm", 13)
+        _text(fig, x + 82, 30, f"☀ {d['sun_h']:.0f} h", 13)
 
 
 # ---------------------------------------------------------------------------
@@ -152,17 +170,8 @@ def home(view):
     _time_axis(ax, t)
     _temp_axis(ax, t, h["temp"])
 
-    # outlook: half-day steps, day max / night min
-    steps = view["outlook"]
-    w = (W - 32) / max(len(steps), 1)
-    for i, s in enumerate(steps):
-        x = 16 + i * w
-        start = datetime.fromisoformat(s["start"])
-        label = f"{start:%a}" + ("" if s["day"] else " night")
-        _text(fig, x + w / 2, 115, label, 13, None if s["day"] else P["MUTED"], ha="center")
-        _icon(fig, s["icon"], x + 4, 18, 80)
-        _text(fig, x + 90, 45, f"{s['temp']:.0f}°", 24, P["TEMP"] if s["day"] else P["COLD"],
-              weight="bold")
+    # daily outlook
+    _daily(fig, view["days"], "precip")
     return fig
 
 
@@ -178,7 +187,7 @@ def boat(view):
     now, h = view["now"], view["hourly"]
 
     # now: wind, gust, direction compass
-    _text(fig, 16, 405, f"{now['wind_kt']:.0f}", 66, P["WIND"], weight="bold")
+    _text(fig, 16, 405, f"{now['wind_kt']:.0f}", 66, weight="bold")
     _text(fig, 22 + 50 * len(f"{now['wind_kt']:.0f}"), 405, "kt", 18, P["MUTED"])
     _text(fig, 18, 372, f"gusts {now['gust_kt']:.0f} kt · Bft {_beaufort(now['wind_kt'])}", 14,
           P["MUTED"])
@@ -300,17 +309,7 @@ def chalet(view):
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
 
     # daily outlook
-    days = view["days"]
-    w = (W - 32) / max(len(days), 1)
-    for i, d in enumerate(days):
-        x = 16 + i * w
-        day = datetime.fromisoformat(d["date"])
-        _text(fig, x + 4, 112, f"{day:%a %d}", 13, weight="bold")
-        _icon(fig, d["icon"], x, 18, 78)
-        _text(fig, x + 82, 78, f"{d['tmin']:.0f}/{d['tmax']:.0f}°", 15, weight="bold")
-        _text(fig, x + 82, 54, f"❄ {d['snow_cm']:.0f} cm", 13,
-              P["SNOW_TEXT"] if d["snow_cm"] >= 1 else P["MUTED"])
-        _text(fig, x + 82, 30, f"☀ {d['sun_h']:.0f} h", 13, P["SUN_TEXT"] if d["sun_h"] >= 1 else P["MUTED"])
+    _daily(fig, view["days"], "snow")
     return fig
 
 

@@ -6,7 +6,7 @@ notebooks before moving to a LilyGO T5 4.7" e-paper (ESP32-S3).
 
 | notebook | shows |
 |---|---|
-| `notebooks/Home.ipynb` | forecast for now, estimated solar production today, 48 h temperature + rain/snow, half-day min/max outlook |
+| `notebooks/Home.ipynb` | forecast for now, estimated solar production today, 48 h temperature + rain/snow, daily outlook (min/max, precipitation, sunshine) |
 | `notebooks/Boat.ipynb` | 48 h wind in knots: mean with 10–90 % range, gusts, direction |
 | `notebooks/Chalet.ipynb` | estimated new snow and sunshine, daily outlook, SLF avalanche bulletin (level, problem, aspects, altitude) |
 

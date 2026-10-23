@@ -31,11 +31,11 @@ TZ = ZoneInfo("Europe/Zurich")
 KMH_TO_KT = 1 / 1.852
 
 # parameters the views need (see the OGD parameter metadata for descriptions)
-HOME_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0", "zprfr0hs",
+HOME_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0", "zprfr0hs", "sre000h0",
                "gre000h0", "ods000h0", "jp2000d0", "tre200pn", "tre200px"]
 BOAT_PARAMS = ["fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
                "fu3q90h1", "tre200h0", "jww003i0"]
-CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rreq90h0", "rp0003i0",
+CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0",
                  "zprfr0hs", "sre000h0", "jp2000d0", "tre200pn", "tre200px"]
 DAILY = {"jp2000d0", "tre200pn", "tre200px", "rka150p0", "rreq10p0", "rreq90p0"}
 
@@ -217,30 +217,29 @@ def snow_fraction(hourly, altitude):
     return ((500 - gap) / 400).clip(0, 1)
 
 
-def _half_days(hourly, daily, n):
-    """`n` alternating day (06–18) / night (18–06) steps starting with the
-    current or next one: day steps report the max, night steps the min."""
-    now = datetime.now(TZ)
-    start = now.replace(minute=0, second=0, microsecond=0)
-    start = start.replace(hour=6) if 6 <= now.hour < 18 else start.replace(hour=18)
-    if now.hour < 6:
-        start -= timedelta(days=1)
-    steps = []
+def _days(hourly, daily, n, snow_cm=None):
+    """Daily outlook for today and the next `n` - 1 days: icon, min/max,
+    precipitation, sunshine, and estimated new snow if `snow_cm` is given."""
+    today = datetime.now(TZ).date()
+    out = []
     for i in range(n):
-        a = start + timedelta(hours=12 * i)
-        w = hourly[(hourly.index > a) & (hourly.index <= a + timedelta(hours=12))]
-        if w.empty:
+        d = today + timedelta(days=i)
+        on = hourly.index.date == d
+        if not on.any():
             break
-        is_day = a.hour == 6
-        if is_day and a.date() in daily.index and pd.notna(daily.at[a.date(), "jp2000d0"]):
-            icon = int(daily.at[a.date(), "jp2000d0"])
-        else:
-            icon = int(w["jww003i0"].mode().iloc[-1])
-        steps.append({"start": a.isoformat(), "day": is_day,
-                      "temp": round(float(w["tre200h0"].max() if is_day else w["tre200h0"].min()), 1),
-                      "icon": icon,
-                      "precip_mm": round(float(w["rre150h0"].sum()), 1) if "rre150h0" in w else None})
-    return steps
+        day = {
+            "date": d.isoformat(),
+            "icon": int(daily.at[d, "jp2000d0"]) if d in daily.index else None,
+            "tmin": _r(daily.at[d, "tre200pn"]) if d in daily.index else None,
+            "tmax": _r(daily.at[d, "tre200px"]) if d in daily.index else None,
+            "precip_mm": _r(hourly.loc[on, "rre150h0"].sum()),
+            "sun_h": _r(hourly.loc[on, "sre000h0"].sum() / 60),
+        }
+        if snow_cm is not None:
+            day.update(snow_cm=_r(snow_cm[on].sum()),
+                       freezing_m=int(hourly.loc[on, "zprfr0hs"].median()))
+        out.append(day)
+    return out
 
 
 def _now_row(hourly):
@@ -261,9 +260,9 @@ def _r(x, nd=1):
 # Views — plain dicts, the payload a display would receive
 # ---------------------------------------------------------------------------
 
-def home_view(run, hourly, daily, point, pv, hours=48, steps=6):
+def home_view(run, hourly, daily, point, pv, hours=48, days=5):
     """Now (temperature, icon), today's PV estimate, next `hours` of
-    temperature and rain/snow, and `steps` half-day min/max + icon."""
+    temperature and rain/snow, and a `days` daily outlook."""
     pv_kw = pv_power(hourly, point["lat"], point["lon"], **pv)
     today = datetime.now(TZ).date()
     on_today = pv_kw.index.date == today
@@ -289,7 +288,7 @@ def home_view(run, hourly, daily, point, pv, hours=48, steps=6):
             "snow_mm": [_r(v) for v in nxt["rre150h0"] * snow],
             "prob": [int(v) for v in nxt["rp0003i0"]],
         },
-        "outlook": _half_days(hourly, daily, steps),
+        "days": _days(hourly, daily, days),
     }
 
 
@@ -318,25 +317,8 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=48, days=5):
     for `days`, plus the avalanche bulletin summary if given."""
     snow = snow_fraction(hourly, point["alt"])
     snow_cm = hourly["rre150h0"] * snow          # ~1 cm fresh snow per mm water
-    snow_q90_cm = hourly["rreq90h0"] * snow
     nxt = _upcoming(hourly, hours)
     now = _now_row(hourly)
-    today = datetime.now(TZ).date()
-    out_days = []
-    for i in range(days):
-        d = today + timedelta(days=i)
-        on = hourly.index.date == d
-        if not on.any():
-            break
-        out_days.append({
-            "date": d.isoformat(),
-            "icon": int(daily.at[d, "jp2000d0"]) if d in daily.index else None,
-            "tmin": _r(daily.at[d, "tre200pn"]) if d in daily.index else None,
-            "tmax": _r(daily.at[d, "tre200px"]) if d in daily.index else None,
-            "snow_cm": _r(snow_cm[on].sum()), "snow_q90_cm": _r(snow_q90_cm[on].sum()),
-            "sun_h": _r(hourly.loc[on, "sre000h0"].sum() / 60),
-            "freezing_m": int(hourly.loc[on, "zprfr0hs"].median()),
-        })
     return {
         "view": "chalet", "name": point["name"], "alt": point["alt"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
@@ -350,7 +332,7 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=48, days=5):
             "sun_min": [int(v) for v in nxt["sre000h0"]],
             "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
         },
-        "days": out_days,
+        "days": _days(hourly, daily, days, snow_cm),
         "avalanche": bulletin,
     }
 

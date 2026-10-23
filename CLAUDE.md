@@ -8,7 +8,8 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
 (each parameter CSV is ~33 MB for all points).
 
 - Home: forecast for now (temp + pictogram), solar production estimate for
-  today, 48 h temperature + rain/snow, half-day outlook (day max / night min).
+  today, 48 h temperature + rain/snow, 5-day outlook (same pane as chalet,
+  with precipitation instead of new snow).
 - Boat: wind in knots: mean with 10–90 % range, gusts, direction (Lake Geneva).
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
@@ -26,7 +27,10 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
 - Locations: home Renens VD 102000/2, boat Lutry 109500/2 (lake shore,
   392 m), chalet St-Luc 396122/2 (1658 m), SLF region CH-4124 Val d'Anniviers.
 - PV: the placeholder (10 kWp, 30°, south) stays until the user says otherwise.
-- Outlook: 6 half-days (~3 days) is what the user wants.
+- Outlook: home and chalet share the daily pane (`lf._days`,
+  `screens._daily`); the 6 half-day outlook was dropped on 23 Oct 2026.
+- Colour (notebooks) is for charts and icons only: numbers stay in the text
+  colour on all screens.
 - Display: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8: 16 MB flash,
   8 MB PSRAM; ED047TC1 panel 960×540, 16 greys; driver LilyGo-EPD47,
   branch esp32s3). Panel is ~104×58 mm (~234 dpi), so screen text is never
