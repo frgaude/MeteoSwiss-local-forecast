@@ -1,0 +1,11 @@
+# Downloaded forecast data and icons
+data/
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Rendered screens (published by the workflow)
+site/
+# Wi-Fi credentials
+firmware/**/secrets.h

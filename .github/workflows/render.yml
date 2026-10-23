@@ -1,0 +1,48 @@
+# Render the e-paper screens every hour and publish them on GitHub Pages.
+# MeteoSwiss publishes each hourly run 2–7 min past the hour, so start at :10.
+# GitHub may start scheduled jobs late (often 5–20 min) under load; the T5
+# fetches at :40 to leave room for that.
+name: Render screens
+
+on:
+  schedule:
+    - cron: "10 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["render.py", "notebooks/*.py", "requirements.txt", ".github/workflows/render.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Cache pictograms
+        uses: actions/cache@v4
+        with:
+          path: data/local_forecast/icons
+          key: icons-v1
+      - run: python render.py site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
