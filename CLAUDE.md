@@ -35,7 +35,12 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
 - `screens.render(draw, view)` draws a screen at 960×540 snapped to 16 greys;
   `screens.epd_buffer(img)` packs it to 259,200 bytes for
   `epd_draw_grayscale_image` (4 bpp, 0 = black, even x in the low nibble).
-  Only 64 px pictograms exist in the demo repo; they are upscaled.
+- Icons: own vector set in `notebooks/icons.py` (code → sky, precipitation,
+  amount, thunder), bold outlines for e-ink, same shapes in colour. Style
+  inspired by LilyGo-EPD-4-7-OWM-Weather-Display, but its code is
+  "Copyright David Bird, all rights reserved" with no license: do not copy it.
+- `render(draw, view, colour=True)` gives the colour version (notebooks
+  show both); palettes are `screens.COLOUR` / `screens.GREY`.
 - Refresh: every 60 min, plus once on boot/reset. Full refresh each time.
   Runs are named by the hour and published 2–7 min past it (checked 22 Oct
   2026): the workflow renders at :10, the T5 fetches at :40 because GitHub
@@ -55,6 +60,6 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   `T5-ePaper-S3` board file copied to `firmware/boards/`, LilyGo-EPD47 pinned
   to commit 5022422 of branch esp32s3. `include/secrets.h` is gitignored.
 
-## Open questions for the user
-
-1. Firmware compiles but has not run on hardware yet.
+- Firmware runs on the T5 (flashed 23 Oct 2026 over native USB, COM14):
+  downloads, display and button all work. Wakes at HH:40 (sleeps ≥ 5 min
+  after a fetch), retries after 10 min on failure.

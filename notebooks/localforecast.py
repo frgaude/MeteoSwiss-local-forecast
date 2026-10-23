@@ -401,22 +401,11 @@ def slf_regions(lang="en", active_at="2026-02-15T10:00:00Z"):
 
 
 # ---------------------------------------------------------------------------
-# Icons (from the MeteoSwiss demo repo, BSD-3-Clause)
+# Pictogram descriptions (from the MeteoSwiss demo repo, BSD-3-Clause)
 # ---------------------------------------------------------------------------
 
-def icon_path(code, size=64):
-    """Local path of the PNG for a MeteoSwiss pictogram code, downloaded once."""
-    path = os.path.join(OUT_DIR, "icons", str(size), f"{code}.png")
-    if not os.path.exists(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        r = requests.get(f"{ICONS_URL}png/{size}/{code}.png", timeout=30)
-        r.raise_for_status()
-        with open(path, "wb") as f:
-            f.write(r.content)
-    return path
-
-
 def icon_text(code, lang="en"):
+    """Description of MeteoSwiss pictogram `code`, e.g. "very cloudy, light rain"."""
     path = os.path.join(OUT_DIR, "icons", "symbols.json")
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)

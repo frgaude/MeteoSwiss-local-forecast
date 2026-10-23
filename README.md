@@ -63,6 +63,8 @@ load and pauses them in repositories with no activity for 60 days.
   SolarProduction demo but without pvlib.
 - The SLF bulletin (`aws.slf.ch`) is empty outside the winter season; set
   `SLF_ACTIVE_AT` to a past winter time to try the layout.
-- Weather icons come from
+- Weather icons are drawn as vectors by `notebooks/icons.py` (bold outlines
+  for e-paper, the same shapes in colour for the notebooks), one per
+  MeteoSwiss pictogram code; the code descriptions come from
   [MeteoSwiss/opendata-localforecast-demos](https://github.com/MeteoSwiss/opendata-localforecast-demos)
-  (BSD-3-Clause), downloaded on first use.
+  (BSD-3-Clause).
