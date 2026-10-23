@@ -31,7 +31,7 @@
 
 const char *VIEWS[] = {"home", "boat", "chalet"};
 const int N_VIEWS = sizeof(VIEWS) / sizeof(VIEWS[0]);
-const int FETCH_MINUTE = 40;  // render job starts at :10, GitHub may delay it
+const int FETCH_MINUTE = 40;  // render job runs at :12 and :32, GitHub may delay it
 const int RETRY_S = 10 * 60;
 const uint32_t AWAKE_MS = 20000;  // stay awake after the last button press
 const size_t FB_SIZE = EPD_WIDTH * EPD_HEIGHT / 2;  // 960×540, 4 bits per pixel

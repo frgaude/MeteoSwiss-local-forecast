@@ -1,12 +1,13 @@
-# Render the e-paper screens every hour and publish them on GitHub Pages.
-# MeteoSwiss publishes each hourly run 2–7 min past the hour, so start at :10.
-# GitHub may start scheduled jobs late (often 5–20 min) under load; the T5
-# fetches at :40 to leave room for that.
+# Render the e-paper screens and publish them on GitHub Pages every 20 min.
+# MeteoSwiss publishes each hourly run 2–7 min past the hour; the T5 fetches
+# at :40. GitHub delays or drops scheduled jobs under load (only 1 of ~10
+# hourly runs started on 23 Oct 2026), so run three times an hour, away from
+# the busy top of the hour: :12 and :32 both carry the new run to the T5.
 name: Render screens
 
 on:
   schedule:
-    - cron: "10 * * * *"
+    - cron: "12,32,52 * * * *"
   workflow_dispatch:
   push:
     branches: [main]

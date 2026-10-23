@@ -47,7 +47,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   show both); palettes are `screens.COLOUR` / `screens.GREY`.
 - Refresh: every 60 min, plus once on boot/reset. Full refresh each time.
   Runs are named by the hour and published 2–7 min past it (checked 22 Oct
-  2026): the workflow renders at :10, the T5 fetches at :40 because GitHub
+  2026): the workflow renders at :12, :32 and :52 (GitHub dropped most hourly
+  runs on 23 Oct 2026, so three tries an hour), the T5 fetches at :40 because GitHub
   often starts scheduled jobs late.
 - Rendering is server-side: `render.py` → `site/` → GitHub Pages via
   `.github/workflows/render.yml`. One T5: the PlatformIO project `firmware/` (`src/main.cpp`)

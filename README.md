@@ -29,7 +29,7 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 
 ## On the e-paper
 
-    GitHub Actions (hourly, :10)          LilyGO T5 (wakes at :40, on reset, on button)
+    GitHub Actions (:12, :32, :52)        LilyGO T5 (wakes at :40, on reset, on button)
     render.py → site/*.raw, *.png  ──►  GitHub Pages  ──►  download all 3 to flash
                                                             show one, deep sleep
 
@@ -37,8 +37,9 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
   writes `site/` (`<view>.raw` for the panel, `<view>.png` and `index.html` to
   check in a browser, `status.json` with the forecast run). Its configuration
   block repeats the notebooks' point ids.
-- `.github/workflows/render.yml` runs it every hour at :10 (MeteoSwiss
-  publishes 2–7 min past the hour) and deploys `site/` to GitHub Pages. In the
+- `.github/workflows/render.yml` runs it at :12, :32 and :52 (MeteoSwiss
+  publishes 2–7 min past the hour; GitHub often drops scheduled runs, hence
+  three an hour) and deploys `site/` to GitHub Pages. In the
   repository settings, set Pages → Source to "GitHub Actions".
 - `firmware/` is a PlatformIO project (`src/main.cpp`). Each hourly wake
   (and power on / reset) downloads all three screens into flash and shows the
