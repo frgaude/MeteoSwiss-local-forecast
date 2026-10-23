@@ -40,13 +40,15 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 - `.github/workflows/render.yml` runs it every hour at :10 (MeteoSwiss
   publishes 2–7 min past the hour) and deploys `site/` to GitHub Pages. In the
   repository settings, set Pages → Source to "GitHub Actions".
-- `firmware/t5_forecast/` is the Arduino sketch. Each hourly wake (and power
-  on / reset) downloads all three screens into flash and shows the current
-  one; the button (GPIO21) wakes the board and shows the next screen from
-  flash, without Wi-Fi. Copy `secrets.h.example` to `secrets.h` (Wi-Fi and
-  the Pages address), install the LilyGo-EPD47 library (branch `esp32s3`) and
-  flash with board "ESP32S3 Dev Module", PSRAM "OPI PSRAM", flash 16 MB and a
-  partition scheme with at least 1 MB of SPIFFS (the default has 1.5 MB).
+- `firmware/` is a PlatformIO project (`src/main.cpp`). Each hourly wake
+  (and power on / reset) downloads all three screens into flash and shows the
+  current one; the button (GPIO21) wakes the board and shows the next screen
+  from flash, without Wi-Fi. Copy `include/secrets.h.example` to
+  `include/secrets.h` (Wi-Fi and the Pages address), then open `firmware/` in
+  VS Code with the PlatformIO extension, or run
+  `pio run -t upload && pio device monitor` there. Board settings and the
+  LilyGo-EPD47 library (pinned commit of branch `esp32s3`) are in
+  `platformio.ini`.
 
 GitHub Pages sites are public, so the screens (place names, forecasts) can be
 seen by anyone with the address. GitHub can start scheduled jobs late under

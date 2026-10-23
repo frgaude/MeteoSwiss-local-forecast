@@ -9,3 +9,6 @@ __pycache__/
 site/
 # Wi-Fi credentials
 firmware/**/secrets.h
+# PlatformIO build output and generated editor settings
+firmware/.pio/
+firmware/.vscode/

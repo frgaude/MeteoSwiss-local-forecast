@@ -41,7 +41,7 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   2026): the workflow renders at :10, the T5 fetches at :40 because GitHub
   often starts scheduled jobs late.
 - Rendering is server-side: `render.py` → `site/` → GitHub Pages via
-  `.github/workflows/render.yml`. One T5: the sketch `firmware/t5_forecast/`
+  `.github/workflows/render.yml`. One T5: the PlatformIO project `firmware/` (`src/main.cpp`)
   downloads all three `<view>.raw` into LittleFS each hour; the button
   (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet from flash with
   no Wi-Fi. Current view is kept in NVS (Preferences).
@@ -50,7 +50,11 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub
   Actions). First workflow run succeeded on 23 Oct 2026 in ~1 min.
 
+- Firmware builds with PlatformIO (`~/.platformio/penv/Scripts/pio.exe run`
+  in `firmware/`): espressif32@6.12.0 (Arduino core 2.0.x), LilyGO's
+  `T5-ePaper-S3` board file copied to `firmware/boards/`, LilyGo-EPD47 pinned
+  to commit 5022422 of branch esp32s3. `include/secrets.h` is gitignored.
+
 ## Open questions for the user
 
-1. The firmware has not been compiled or run on hardware yet (no Arduino
-   toolchain on this PC); API checked against LilyGo-EPD47 esp32s3 headers.
+1. Firmware compiles but has not run on hardware yet.

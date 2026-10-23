@@ -1,12 +1,8 @@
 // Forecast screens (home, boat, chalet) rendered hourly by render.py and
 // published on GitHub Pages as 4-bit frame buffers.
 //
-// Board: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8).
-// Library: LilyGo-EPD47, branch esp32s3
-//   https://github.com/Xinyuan-LilyGO/LilyGo-EPD47/tree/esp32s3
-// Arduino IDE: board "ESP32S3 Dev Module", PSRAM "OPI PSRAM",
-//   Flash Size "16MB", Partition Scheme with SPIFFS >= 1 MB (the default
-//   "Default 4MB with spiffs" has 1.5 MB), USB CDC On Boot "Enabled".
+// Board: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8), library
+// LilyGo-EPD47 (branch esp32s3); build settings in platformio.ini.
 //
 // Power on, reset, or the hourly timer: download all three screens into
 //   flash (LittleFS), full refresh with the current one, deep sleep until
