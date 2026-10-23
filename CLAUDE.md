@@ -56,7 +56,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   no Wi-Fi. Current view is kept in NVS (Preferences). After a button wake or power
   on / reset it stays awake 20 s after the last press (`AWAKE_MS`, button
   polled every 10 ms by an esp_timer with a 30 ms debounce, also during a
-  refresh; an edge interrupt reading the level double-counted on bounce); hourly timer wakes sleep at
+  refresh; an edge interrupt reading the level double-counted on bounce).
+  Tested on the T5 23 Oct 2026: one log line per press, no double counts; hourly timer wakes sleep at
   once. `epd_poweroff()` between draws, `epd_poweroff_all()` only before
   deep sleep (it zeroes the driver's config register).
   Pages is public (and needs a public repo on a free plan).
