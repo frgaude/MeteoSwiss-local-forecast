@@ -46,6 +46,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet from flash with
   no Wi-Fi. Current view is kept in NVS (Preferences).
   Pages is public (and needs a public repo on a free plan).
+- Repo: https://github.com/frgaude/MeteoSwiss-local-forecast (public), Pages
+  https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub
+  Actions). First workflow run succeeded on 23 Oct 2026 in ~1 min.
 
 ## Open questions for the user
 
