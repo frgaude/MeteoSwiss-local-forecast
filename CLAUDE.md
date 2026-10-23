@@ -54,8 +54,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   downloads all three `<view>.raw` into LittleFS each hour; the button
   (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet from flash with
   no Wi-Fi. Current view is kept in NVS (Preferences). After a button wake or power
-  on / reset it stays awake 20 s after the last press (`AWAKE_MS`, presses
-  counted by interrupt, also during a refresh); hourly timer wakes sleep at
+  on / reset it stays awake 20 s after the last press (`AWAKE_MS`, button
+  polled every 10 ms by an esp_timer with a 30 ms debounce, also during a
+  refresh; an edge interrupt reading the level double-counted on bounce); hourly timer wakes sleep at
   once. `epd_poweroff()` between draws, `epd_poweroff_all()` only before
   deep sleep (it zeroes the driver's config register).
   Pages is public (and needs a public repo on a free plan).

@@ -20,7 +20,10 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <driver/rtc_io.h>
+#include <esp_timer.h>
 #include <time.h>
+
+#include <atomic>
 
 #include "epd_driver.h"
 #include "utilities.h"
@@ -34,8 +37,7 @@ const uint32_t AWAKE_MS = 20000;  // stay awake after the last button press
 const size_t FB_SIZE = EPD_WIDTH * EPD_HEIGHT / 2;  // 960×540, 4 bits per pixel
 
 static uint8_t *fb;
-static volatile uint32_t presses = 0;
-static volatile uint32_t released_at = 0;
+static std::atomic<uint32_t> presses{0};  // added by the button timer task
 
 static bool wifi_connect() {
   WiFi.mode(WIFI_STA);
@@ -109,14 +111,21 @@ static void draw() {
   epd_poweroff();
 }
 
-// Count a press only after the button was up for 50 ms, which ignores
-// contact bounce, including the bounce when the waking press is released.
-static void on_button() {
-  uint32_t now = millis();
-  if (digitalRead(BUTTON_1) == HIGH) {
-    released_at = now;
-  } else if (now - released_at > 50) {
-    presses++;
+// Called every 10 ms by an esp_timer, which keeps running during a refresh.
+// The button changes state only after reading the same for 30 ms, so contact
+// bounce never counts twice; a press counts on the change to down. It starts
+// as down, so the press that woke the board counts only once it is released
+// and pressed again.
+static void sample_button(void *) {
+  static bool down = true;
+  static uint8_t same = 0;
+  bool low = digitalRead(BUTTON_1) == LOW;
+  if (low == down) {
+    same = 0;
+  } else if (++same >= 3) {
+    same = 0;
+    down = low;
+    if (down) presses++;
   }
 }
 
@@ -125,14 +134,15 @@ static void on_button() {
 static int switch_screens(int view) {
   rtc_gpio_deinit((gpio_num_t)BUTTON_1);  // back to a normal GPIO after ext0 wake
   pinMode(BUTTON_1, INPUT_PULLUP);
-  released_at = millis();
   presses = 0;
-  attachInterrupt(digitalPinToInterrupt(BUTTON_1), on_button, CHANGE);
+  esp_timer_create_args_t args = {};
+  args.callback = sample_button;
+  args.name = "button";
+  esp_timer_handle_t timer;
+  esp_timer_create(&args, &timer);
+  esp_timer_start_periodic(timer, 10 * 1000);
   for (uint32_t last = millis(); millis() - last < AWAKE_MS; delay(20)) {
-    noInterrupts();
-    uint32_t n = presses;
-    presses = 0;
-    interrupts();
+    uint32_t n = presses.exchange(0);
     if (n) {
       view = (view + n) % N_VIEWS;
       Serial.printf("button: %s\n", VIEWS[view]);
@@ -140,7 +150,8 @@ static int switch_screens(int view) {
       last = millis();
     }
   }
-  detachInterrupt(digitalPinToInterrupt(BUTTON_1));
+  esp_timer_stop(timer);
+  esp_timer_delete(timer);
   return view;
 }
 
