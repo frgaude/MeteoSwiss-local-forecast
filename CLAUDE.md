@@ -53,7 +53,11 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   `.github/workflows/render.yml`. One T5: the PlatformIO project `firmware/` (`src/main.cpp`)
   downloads all three `<view>.raw` into LittleFS each hour; the button
   (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet from flash with
-  no Wi-Fi. Current view is kept in NVS (Preferences).
+  no Wi-Fi. Current view is kept in NVS (Preferences). After a button wake or power
+  on / reset it stays awake 20 s after the last press (`AWAKE_MS`, presses
+  counted by interrupt, also during a refresh); hourly timer wakes sleep at
+  once. `epd_poweroff()` between draws, `epd_poweroff_all()` only before
+  deep sleep (it zeroes the driver's config register).
   Pages is public (and needs a public repo on a free plan).
 - Repo: https://github.com/frgaude/MeteoSwiss-local-forecast (public), Pages
   https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub

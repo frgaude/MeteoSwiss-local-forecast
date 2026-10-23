@@ -8,8 +8,10 @@
 //   flash (LittleFS), full refresh with the current one, deep sleep until
 //   HH:FETCH_MINUTE. Failed downloads keep the previous copy; retry after
 //   RETRY_S.
-// Button (BUTTON_1, GPIO21): wake, show the next screen from flash (no
-//   Wi-Fi), sleep again. The chosen screen is kept across resets.
+// Button (BUTTON_1, GPIO21): wake and show the next screen from flash (no
+//   Wi-Fi). It then stays awake AWAKE_MS after the last press (also after
+//   power on / reset) so further presses keep switching screens. The chosen
+//   screen is kept across resets.
 
 #include <Arduino.h>
 #include <HTTPClient.h>
@@ -28,9 +30,12 @@ const char *VIEWS[] = {"home", "boat", "chalet"};
 const int N_VIEWS = sizeof(VIEWS) / sizeof(VIEWS[0]);
 const int FETCH_MINUTE = 40;  // render job starts at :10, GitHub may delay it
 const int RETRY_S = 10 * 60;
+const uint32_t AWAKE_MS = 20000;  // stay awake after the last button press
 const size_t FB_SIZE = EPD_WIDTH * EPD_HEIGHT / 2;  // 960×540, 4 bits per pixel
 
 static uint8_t *fb;
+static volatile uint32_t presses = 0;
+static volatile uint32_t released_at = 0;
 
 static bool wifi_connect() {
   WiFi.mode(WIFI_STA);
@@ -101,11 +106,48 @@ static void draw() {
   epd_poweron();
   epd_clear();  // full refresh every time: no ghosting from partial updates
   epd_draw_grayscale_image(epd_full_screen(), fb);
-  epd_poweroff_all();
+  epd_poweroff();
+}
+
+// Count a press only after the button was up for 50 ms, which ignores
+// contact bounce, including the bounce when the waking press is released.
+static void on_button() {
+  uint32_t now = millis();
+  if (digitalRead(BUTTON_1) == HIGH) {
+    released_at = now;
+  } else if (now - released_at > 50) {
+    presses++;
+  }
+}
+
+// Keep switching screens on button presses (also those made during a
+// refresh) until AWAKE_MS without one. Returns the screen shown last.
+static int switch_screens(int view) {
+  rtc_gpio_deinit((gpio_num_t)BUTTON_1);  // back to a normal GPIO after ext0 wake
+  pinMode(BUTTON_1, INPUT_PULLUP);
+  released_at = millis();
+  presses = 0;
+  attachInterrupt(digitalPinToInterrupt(BUTTON_1), on_button, CHANGE);
+  for (uint32_t last = millis(); millis() - last < AWAKE_MS; delay(20)) {
+    noInterrupts();
+    uint32_t n = presses;
+    presses = 0;
+    interrupts();
+    if (n) {
+      view = (view + n) % N_VIEWS;
+      Serial.printf("button: %s\n", VIEWS[view]);
+      if (load(VIEWS[view])) draw();
+      last = millis();
+    }
+  }
+  detachInterrupt(digitalPinToInterrupt(BUTTON_1));
+  return view;
 }
 
 // Seconds until the next HH:FETCH_MINUTE, from the clock set by NTP (it keeps
 // running in deep sleep). Swiss time is a whole number of hours from UTC.
+// A negative `min_wait` means "if HH:FETCH_MINUTE passed less than that
+// long ago, fetch now" (after the button window ran past it).
 static uint32_t seconds_to_next_fetch(int min_wait) {
   time_t now = time(nullptr);
   if (now < 1700000000) return 3600;  // clock never set
@@ -113,7 +155,7 @@ static uint32_t seconds_to_next_fetch(int min_wait) {
   gmtime_r(&now, &t);
   int wait = FETCH_MINUTE * 60 - (t.tm_min * 60 + t.tm_sec);
   while (wait < min_wait) wait += 3600;
-  return wait;
+  return max(wait, 1);
 }
 
 static void sleep_for(uint32_t seconds) {
@@ -121,6 +163,7 @@ static void sleep_for(uint32_t seconds) {
   for (uint32_t t0 = millis(); digitalRead(BUTTON_1) == LOW && millis() - t0 < 5000;) {
     delay(10);  // wait for release, or the press would wake us straight away
   }
+  epd_poweroff_all();
   esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_1, 0);
   rtc_gpio_pullup_en((gpio_num_t)BUTTON_1);
   rtc_gpio_pulldown_dis((gpio_num_t)BUTTON_1);
@@ -142,12 +185,9 @@ void setup() {
   Preferences prefs;
   prefs.begin("forecast");
   int view = prefs.getInt("view", 0) % N_VIEWS;
-  bool button = esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
-  if (button) {
-    view = (view + 1) % N_VIEWS;
-    prefs.putInt("view", view);
-  }
-  prefs.end();
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  bool button = cause == ESP_SLEEP_WAKEUP_EXT0;
+  if (button) view = (view + 1) % N_VIEWS;
 
   // the button only switches screens, unless nothing is stored yet
   bool fetch = !button || !load(VIEWS[view]);
@@ -164,7 +204,12 @@ void setup() {
     WiFi.mode(WIFI_OFF);
   }
   if (load(VIEWS[view])) draw();
-  sleep_for(ok ? seconds_to_next_fetch(fetch ? 5 * 60 : 1) : RETRY_S);
+  // someone is at the board (button, power on, reset): give them time to
+  // switch screens; the hourly timer goes straight back to sleep
+  if (cause != ESP_SLEEP_WAKEUP_TIMER) view = switch_screens(view);
+  if (prefs.getInt("view", 0) != view) prefs.putInt("view", view);
+  prefs.end();
+  sleep_for(ok ? seconds_to_next_fetch(fetch ? 5 * 60 : -(int)(AWAKE_MS / 1000) - 60) : RETRY_S);
 }
 
 void loop() {}

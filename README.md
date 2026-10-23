@@ -43,7 +43,8 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 - `firmware/` is a PlatformIO project (`src/main.cpp`). Each hourly wake
   (and power on / reset) downloads all three screens into flash and shows the
   current one; the button (GPIO21) wakes the board and shows the next screen
-  from flash, without Wi-Fi. Copy `include/secrets.h.example` to
+  from flash, without Wi-Fi, then stays awake 20 s after the last press so
+  you can keep switching. Copy `include/secrets.h.example` to
   `include/secrets.h` (Wi-Fi and the Pages address), then open `firmware/` in
   VS Code with the PlatformIO extension, or run
   `pio run -t upload && pio device monitor` there. Board settings and the
