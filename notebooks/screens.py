@@ -25,7 +25,7 @@ import localforecast as lf
 W, H = 960, 540
 # greys each land on one of the panel's 16 levels (multiples of 0x11)
 GREY = {"INK": "#000000", "MUTED": "#444444", "GRID": "#bbbbbb", "NIGHT": "#eeeeee",
-        "TEMP": "#000000", "RAIN": "#000000", "SNOW": "#999999",
+        "TEMP": "#000000", "RAIN": "#888888", "SNOW": "#cccccc",
         "SUN": "#555555", "WIND": "#000000", "BAND": "#cccccc", "GUST": "#000000",
         "ROSE": "#444444", "ICONS": icons.GREY,
         # EAWS danger levels 1–5, light to dark; white text from level 3
@@ -63,6 +63,11 @@ def _text(fig, x, y, s, size=12, color=None, weight="normal", ha="left", va="bas
     fig.text(x / W, y / H, s, fontsize=size, color=color or P["INK"], weight=weight, ha=ha, va=va)
 
 
+def _deg(v):
+    """Whole degrees, without the "-0" that rounding -0.4 gives."""
+    return f"{round(v) + 0}°"
+
+
 def _times(hourly):
     return [datetime.fromisoformat(t) for t in hourly["time"]]
 
@@ -92,7 +97,7 @@ def _temp_axis(ax, t, temp, lo=None):
              path_effects=[pe.Stroke(linewidth=7, foreground="white"), pe.Normal()])
     ax2.set_ylim((min(temp) if lo is None else min(min(temp), lo)) - 2, max(temp) + 2)
     ax2.yaxis.set_major_locator(plt.MaxNLocator(4, integer=True))
-    ax2.yaxis.set_major_formatter(lambda v, _: f"{v:.0f}°")
+    ax2.yaxis.set_major_formatter(lambda v, _: _deg(v))
     ax2.tick_params(length=0, labelsize=12, labelcolor=P["INK"])
     for s in ("top", "left", "right"):
         ax2.spines[s].set_visible(False)
@@ -118,7 +123,7 @@ def _daily(fig, days, extra):
         day = datetime.fromisoformat(d["date"])
         _text(fig, x + 4, 112, f"{day:%a %d}", 13, weight="bold")
         _icon(fig, d["icon"], x, 18, 78)
-        _text(fig, x + 82, 78, f"{d['tmin']:.0f}/{d['tmax']:.0f}°", 15, weight="bold")
+        _text(fig, x + 82, 78, f"{round(d['tmin']) + 0}/{_deg(d['tmax'])}", 15, weight="bold")
         if extra == "snow":
             _text(fig, x + 82, 54, f"❄ {d['snow_cm']:.0f} cm", 13)
         else:
@@ -136,7 +141,7 @@ def home(view):
 
     # now: icon + forecast temperature for this hour
     _icon(fig, now["icon"], 10, 360, 120)
-    _text(fig, 140, 410, f"{now['temp']:.0f}°", 60, weight="bold")
+    _text(fig, 140, 410, _deg(now['temp']), 60, weight="bold")
     _text(fig, 144, 378, lf.icon_text(now["icon"]), 13, P["MUTED"])
 
     # solar: today's estimated energy + hourly profile
@@ -210,7 +215,7 @@ def boat(view):
     _text(fig, 370, 400, f"max gust {max(h['gust_kt'][nxt12]):.0f} kt", 15)
     _text(fig, 370, 375, f"up to {max(h['gust_q90_kt'][nxt12]):.0f} kt at 90 %", 13, P["MUTED"])
     _icon(fig, now["icon"], W - 115, 365, 100)
-    _text(fig, W - 120, 395, f"{now['temp']:.0f}°", 26, weight="bold", ha="right")
+    _text(fig, W - 120, 395, _deg(now['temp']), 26, weight="bold", ha="right")
 
     # 48 h wind: mean with 10–90 % band, gusts, direction
     ax = _axes(fig, 52, 42, 893, 300)
@@ -257,7 +262,7 @@ def chalet(view):
     now, h = view["now"], view["hourly"]
 
     _icon(fig, now["icon"], 8, 368, 105)
-    _text(fig, 118, 412, f"{now['temp']:.0f}°", 50, weight="bold")
+    _text(fig, 118, 412, _deg(now['temp']), 50, weight="bold")
     _text(fig, 121, 380, f"0° level {now['freezing_m']} m", 13, P["MUTED"])
 
     _label(fig, 330, 462, "new snow 48 h (est.)")

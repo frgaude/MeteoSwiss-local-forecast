@@ -12,10 +12,10 @@ import numpy as np
 from matplotlib.patches import Circle, FancyBboxPatch, Polygon
 
 COLOUR = {"line": "#343a40", "sun": "#ffc21a", "sun_edge": "#f59f00", "ray": "#f59f00", "moon": "#ffe066",
-          "cloud": "#f8f9fa", "dark": "#adb5bd", "rain": "#1c7ed6", "snow": "#4dabf7",
+          "cloud": "#f8f9fa", "dark": "#ced4da", "rain": "#1c7ed6", "snow": "#4dabf7",
           "bolt": "#fcc419", "fog": "#868e96", "bg": "white"}
 GREY = {"line": "#000000", "sun": "#ffffff", "sun_edge": "#000000", "ray": "#000000", "moon": "#ffffff",
-        "cloud": "#ffffff", "dark": "#999999", "rain": "#000000", "snow": "#000000",
+        "cloud": "#ffffff", "dark": "#cccccc", "rain": "#000000", "snow": "#000000",
         "bolt": "#000000", "fog": "#000000", "bg": "white"}
 
 # code (day, 1–42) → (sky, precipitation, amount 1–3, thunder)
