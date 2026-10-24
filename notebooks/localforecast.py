@@ -48,18 +48,25 @@ def latest_run():
     """Return (run, {param: csv url}) for the newest run published.
 
     Items are named by production date (local), so look at today's item and
-    fall back to yesterday's just after midnight."""
+    fall back to yesterday's: just after midnight today's item exists but
+    is still empty. A run's files arrive over a few minutes, so only runs
+    with as many files as the fullest run of the item count."""
     today = datetime.now(TZ).date()
     for day in (today, today - timedelta(days=1)):
         r = requests.get(f"{STAC}/collections/{COLLECTION}/items/{day:%Y%m%d}-ch", timeout=30)
         if r.status_code == 404:
             continue
         r.raise_for_status()
-        assets = r.json()["assets"]
+        runs = {}
         # asset keys look like vnut12.lssw.<YYYYMMDDHHMM>.<param>.csv
-        run = max(k.split(".")[2] for k in assets)
-        return run, {k.split(".")[3]: a["href"] for k, a in assets.items() if k.split(".")[2] == run}
-    raise RuntimeError("no local-forecast item for today or yesterday")
+        for k, a in r.json()["assets"].items():
+            runs.setdefault(k.split(".")[2], {})[k.split(".")[3]] = a["href"]
+        if not runs:
+            continue
+        full = max(len(u) for u in runs.values())
+        run = max(k for k, u in runs.items() if len(u) == full)
+        return run, runs[run]
+    raise RuntimeError("no local-forecast run for today or yesterday")
 
 
 def points():
