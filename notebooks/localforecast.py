@@ -37,7 +37,7 @@ KMH_TO_KT = 1 / 1.852
 HOME_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0", "zprfr0hs", "sre000h0",
                "gre000h0", "ods000h0", "jp2000d0", "tre200pn", "tre200px"]
 BOAT_PARAMS = ["fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
-               "fu3q90h1", "tre200h0", "jww003i0"]
+               "fu3q90h1", "tre200h0", "jww003i0", "rre003i0"]
 CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0",
                  "zprfr0hs", "sre000h0", "jp2000d0", "tre200pn", "tre200px"]
 MOUNTAIN_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "zprfr0hs", "sre000h0",
@@ -379,7 +379,8 @@ def boat_view(run, hourly, point, measured=None, hours=39):
         "view": "boat", "name": point["name"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "wind_kt": _r(now["fu3010h0"] * KMH_TO_KT),
                 "gust_kt": _r(now["fu3010h1"] * KMH_TO_KT), "dir": int(now["dkl010h0"]),
-                "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"])},
+                "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
+                "rain_3h_mm": _r(now["rre003i0"])},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "wind_kt": kt("fu3010h0"), "wind_q10_kt": kt("fu3q10h0"), "wind_q90_kt": kt("fu3q90h0"),

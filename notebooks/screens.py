@@ -296,38 +296,34 @@ def boat(view):
     _header(fig, view)
     now, h = view["now"], view["hourly"]
 
-    # forecast for now: wind dial (direction and mean speed), gusts and
-    # Beaufort beside it
-    _wind_dial(fig, 10, 352, 140, now["dir"], now["wind_kt"], "kt")
-    _label(fig, 170, 468, "forecast gusts")
-    _value_unit(fig, 170, 412, f"{now['gust_kt']:.0f}", "kt", 40)
-    _text(fig, 170, 380, f"Beaufort {_beaufort(now['wind_kt'])}", 13, P["MUTED"])
+    # forecast for now and measured at the port, side by side: a wind dial
+    # (direction and mean speed) each, with a few plain lines beside it
+    def lines(x, title, rows):                # title as given (time stays "23h01")
+        _text(fig, x, 468, title, 11, P["MUTED"], weight="bold")
+        for i, row in enumerate(rows):
+            _text(fig, x, 430 - 25 * i, row, 14)
 
-    # measured at the port (WindSpots), the same way: dial, gusts beside it,
-    # with the water temperature and the strongest gust of the last 12 h
+    _wind_dial(fig, 10, 352, 140, now["dir"], now["wind_kt"], "kt")
+    lines(165, "FORECAST", [f"gusts {now['gust_kt']:.0f} kt",
+                            f"rain 3 h {now['rain_3h_mm']:.1f} mm",
+                            f"Beaufort {_beaufort(now['wind_kt'])}"])
+
     t = _times(h)
     m = view.get("measured")
     when = datetime.fromisoformat(m["time"]) if m else None
     stale = (not m or m["status"] != "green"
              or datetime.now(lf.TZ) - when > timedelta(hours=2))
     if stale:
-        _label(fig, 330, 468, "measured · Lutry port (WindSpots)")
-        _text(fig, 330, 412, "no recent measurement", 15)
-        if m:
-            _text(fig, 330, 380, f"last {when:%a %H:%M} · station {m['status']}", 13, P["MUTED"])
+        lines(330, "LUTRY PORT", ["no recent measurement"]
+              + ([f"last {when:%a %H}h{when:%M} · {m['status']}"] if m else []))
     else:
-        _wind_dial(fig, 320, 352, 140, m["dir"], m["wind_kt"], "kt")
-        _label(fig, 480, 468, f"measured gusts · Lutry port {when:%H:%M}")
-        _value_unit(fig, 480, 412, f"{m['gust_kt']:.0f}", "kt", 40)
-        # the other stats in a column right of the gust figure
-        stats = []
+        _wind_dial(fig, 330, 352, 140, m["dir"], m["wind_kt"], "kt")
+        rows = [f"gusts {m['gust_kt']:.0f} kt"]
         if m["water_c"] is not None:
-            stats.append(f"water {m['water_c']:.1f}°")
+            rows.append(f"water {m['water_c']:.1f}°")
         if m["gust_max_12h_kt"] is not None:
-            stats.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt")
-        stats.append("WindSpots")
-        for i, line in enumerate(stats):
-            _text(fig, 600, 430 - 25 * i, line, 13, P["MUTED"])
+            rows.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt · WindSpots")
+        lines(485, f"LUTRY PORT {when:%H}h{when:%M}", rows)
     _icon(fig, now["icon"], W - 115, 365, 100)
     _text(fig, W - 120, 425, _deg(now['temp']), 26, weight="bold", ha="right")
 
