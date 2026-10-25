@@ -10,6 +10,7 @@ drawn in colour for the notebooks.
     buf = epd_buffer(img)                   # 259,200 bytes for LilyGo-EPD47
     img = render(home, view, colour=True)   # colour preview
 """
+import math
 from datetime import datetime
 
 import matplotlib.patheffects as pe
@@ -90,6 +91,14 @@ def _shade_nights(ax, times):
                        color=P["NIGHT"], lw=0, zorder=0)
 
 
+def _precip_scale(ax, totals):
+    """Precipitation axis like the MeteoSwiss app: at least 0–8 per hour,
+    extended in steps of 2 for heavier forecasts, ticks every quarter."""
+    top = max(8, 2 * math.ceil(max(totals, default=0) / 2))
+    ax.set_ylim(0, top)
+    ax.set_yticks(range(0, top + 1, top // 4))
+
+
 def _temp_axis(ax, t, temp, lo=None):
     """Temperature line on a right-hand axis, with a white halo over bars."""
     ax2 = ax.twinx()
@@ -168,8 +177,7 @@ def home(view):
     _shade_nights(ax, t)
     ax.bar(t, h["rain_mm"], width=1 / 26, color=P["RAIN"], label="rain")
     ax.bar(t, h["snow_mm"], bottom=h["rain_mm"], width=1 / 26, color=P["SNOW"], label="snow")
-    ax.set_ylim(0, max(2, max(r + s for r, s in zip(h["rain_mm"], h["snow_mm"])) * 1.2))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(3))
+    _precip_scale(ax, [r + s for r, s in zip(h["rain_mm"], h["snow_mm"])])
     ax.set_ylabel("mm/h", fontsize=11)
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
     _time_axis(ax, t)
@@ -306,8 +314,7 @@ def chalet(view):
     _shade_nights(ax, t)
     ax.bar(t, h["snow_cm"], width=1 / 26, color=P["SNOW"], label="snow cm")
     ax.bar(t, h["rain_mm"], bottom=h["snow_cm"], width=1 / 26, color=P["RAIN"], label="rain mm")
-    ax.set_ylim(0, max(1, max(s + r for s, r in zip(h["snow_cm"], h["rain_mm"])) * 1.25))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(3))
+    _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
     _time_axis(ax, t)
     ax2 = _temp_axis(ax, t, h["temp"], lo=0)
