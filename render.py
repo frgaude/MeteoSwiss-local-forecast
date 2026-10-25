@@ -29,7 +29,7 @@ CHALET = (396123, 2)      # Chandolin, 1900 m
 MOUNTAIN = (1119, 3)      # Le Toûno, 3018 m (point of interest)
 SLF_REGION = "CH-4124"    # Val d'Anniviers
 SLF_STATION = "ANV2"      # Orzival, 2640 m: measured snow depth
-PV = {"kwp": 10, "tilt": 30, "azimuth": 180}
+PV = {"kwp": 7.905, "tilt": 29, "azimuth": 212, "derate": 0.88}   # azimuth 180 = south
 # ─────────────────────────────────────────────────────────────────────────────
 
 

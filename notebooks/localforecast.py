@@ -295,27 +295,38 @@ def _r(x, nd=1):
 # Views — plain dicts, the payload a display would receive
 # ---------------------------------------------------------------------------
 
+def _solar_day(pv_kw, point):
+    """PV estimate for today, or for tomorrow once today's sunset is more
+    than an hour past: total, peak, hourly kW by hour start, and the
+    following day's total."""
+    now = pd.Timestamp.now(TZ)
+    today = now.date()
+    midnight = pd.Timestamp(today).tz_localize(TZ)
+    sets = [pd.Timestamp(e["time"]) for e in sun_events(point["lat"], point["lon"], midnight.isoformat(),
+                                                        (midnight + pd.Timedelta(days=1)).isoformat())
+            if not e["rise"]]
+    day = today + timedelta(days=1) if sets and now > sets[-1] + pd.Timedelta(hours=1) else today
+    starts = pv_kw.index - pd.Timedelta(hours=1)     # values are stamped at the end of their hour
+    on = starts.date == day
+    return {"date": day.isoformat(), "tomorrow": day != today,
+            "kwh": _r(pv_kw[on].sum()), "peak_kw": _r(pv_kw[on].max(), 2),
+            "next_kwh": _r(pv_kw[starts.date == day + timedelta(days=1)].sum()),
+            "hourly_kw": [_r(v, 2) for v in pv_kw[on].values],
+            "hours": [t.hour for t in starts[on]]}
+
+
 def home_view(run, hourly, daily, point, pv, hours=39, days=5):
-    """Now (temperature, icon), today's PV estimate, `hours` of temperature
-    and rain/snow from the last 00:00 / 12:00, and a `days` daily outlook."""
+    """Now (temperature, icon), the PV estimate for today (tomorrow after
+    sunset), `hours` of temperature and rain/snow from the last 00:00 /
+    12:00, and a `days` daily outlook."""
     pv_kw = pv_power(hourly, point["lat"], point["lon"], **pv)
-    today = datetime.now(TZ).date()
-    on_today = pv_kw.index.date == today
     now = _now_row(hourly)
     nxt, chart = _chart_window(hourly, hours)
     snow = snow_fraction(nxt, point["alt"])
     return {
         "view": "home", "name": point["name"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"])},
-        "solar": {
-            "kwp": pv["kwp"],
-            "today_kwh": _r(pv_kw[on_today].sum()),
-            "remaining_kwh": _r(pv_kw[on_today & (pv_kw.index > pd.Timestamp.now(TZ))].sum()),
-            "peak_kw": _r(pv_kw[on_today].max(), 2),
-            "tomorrow_kwh": _r(pv_kw[pv_kw.index.date == today + timedelta(days=1)].sum()),
-            "hourly_kw": [_r(v, 2) for v in pv_kw[on_today].values],
-            "hours": [t.hour for t in pv_kw[on_today].index],
-        },
+        "solar": {"kwp": pv["kwp"], **_solar_day(pv_kw, point)},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
@@ -393,7 +404,9 @@ def sun_events(lat, lon, start, end):
     """Sunrise and sunset times between `start` and `end` (ISO strings), for
     the standard horizon (sun centre 0.833° below it, for refraction); within
     a few minutes of the times MeteoSwiss shows."""
-    t = pd.date_range(pd.Timestamp(start), pd.Timestamp(end), freq="1min")
+    # in UTC: across a DST change the two ends have different local offsets
+    t = pd.date_range(pd.Timestamp(start).tz_convert("UTC"), pd.Timestamp(end).tz_convert("UTC"),
+                      freq="1min")
     zenith, _ = solar_position(t, lat, lon)
     up = zenith < 90.833
     return [{"time": t[i + 1].tz_convert(TZ).isoformat(timespec="minutes"), "rise": bool(up[i + 1])}

@@ -185,22 +185,34 @@ def home(view):
     for i, line in enumerate(textwrap.wrap(lf.icon_text(now["icon"]), 34)[:2]):
         _text(fig, 144, 378 - 18 * i, line, 13, P["MUTED"])
 
-    # solar: today's estimated energy + hourly profile
-    _label(fig, 470, 462, "solar today (est.)")
-    _text(fig, 470, 412, f"{solar['today_kwh']:.1f}", 40, weight="bold")
-    _text(fig, 475 + 30 * len(f"{solar['today_kwh']:.1f}"), 412, "kWh", 15, P["MUTED"])
-    _text(fig, 470, 380, f"tomorrow {solar['tomorrow_kwh']:.1f} kWh", 13, P["MUTED"])
-    ax = _axes(fig, 735, 382, 210, 85)
-    hours = solar["hours"]
-    ax.bar(hours, solar["hourly_kw"], width=0.85, color=P["SUN"])
-    ax.axvline(datetime.now(lf.TZ).hour, color=P["INK"], lw=1.5, ls=":")
-    ax.set_xlim(5.5, 20.5)
-    ax.set_ylim(0, max(0.1, max(solar["hourly_kw"]) * 1.1))
+    # solar: estimated energy for today (tomorrow from an hour after sunset)
+    # and its hourly profile in kW
+    tomorrow = solar["tomorrow"]
+    _label(fig, 470, 468, "solar tomorrow (est.)" if tomorrow else "solar today (est.)")
+    _value_unit(fig, 470, 412, f"{solar['kwh']:.1f}", "kWh", 40)
+    _text(fig, 470, 380, f"{'day after' if tomorrow else 'tomorrow'} {solar['next_kwh']:.1f} kWh", 13,
+          P["MUTED"])
+    ax = _axes(fig, 768, 382, 177, 80)
+    ax.bar(solar["hours"], solar["hourly_kw"], width=0.85, align="edge", color=P["SUN"])
+    if not tomorrow:
+        now = datetime.now(lf.TZ)
+        ax.axvline(now.hour + now.minute / 60, color=P["INK"], lw=1.5, ls=":")
+    # fixed scale from 0 to the system's peak power, so days compare
+    top = solar["kwp"]
+    step = 2 if top <= 12 else 5
+    ticks = list(range(0, int(top) + 1, step))
+    if top - ticks[-1] >= step / 2:
+        ticks.append(top)
+    ax.set_ylim(0, top)
+    ax.set_yticks(ticks, [f"{v:g}" if v == int(v) else f"{v:.1f}" for v in ticks])
+    for v in ticks[1:]:
+        ax.axhline(v, color=P["GRID"], lw=1, zorder=0)
+    ax.set_xlim(5, 21)
     ax.set_xticks([6, 12, 18])
-    ax.set_yticks([])
     for s in ("top", "right", "left"):
         ax.spines[s].set_visible(False)
-    ax.tick_params(length=0, labelsize=11)
+    ax.tick_params(length=0, labelsize=10)
+    _text(fig, 768, 468, "kW", 10, P["MUTED"], weight="bold", ha="right")
 
     # next hours: temperature line over rain/snow bars
     h = view["hourly"]

@@ -38,7 +38,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   392 m), chalet Chandolin 396123/2 (1900 m, was St-Luc until 25 Oct 2026),
   SLF region CH-4124 Val d'Anniviers; mountain Le Toûno 1119/3 (point of
   interest, 3018 m; `find_point` ignores accents, "touno" finds it).
-- PV: the placeholder (10 kWp, 30°, south) stays until the user says otherwise.
+- PV (user's real system, 25 Oct 2026): 7.905 kWp, derate 0.88, tilt 29°,
+  azimuth 212° (180 = south). Home shows today's estimate, tomorrow's from
+  1 h after sunset (`lf._solar_day`); the hourly mini chart has a kW scale.
 - Charts (all screens): 39 h from the last local 00:00 / 12:00 (so the past
   hours show too), a tick every 3 h (weekday at midnight), gridlines at
   00:00 / 12:00, a vertical line at render time (`lf._chart_window`,
