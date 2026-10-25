@@ -274,6 +274,19 @@ def _upcoming(hourly, hours):
     return hourly[(hourly.index > now) & (hourly.index <= now + pd.Timedelta(hours=hours))]
 
 
+def _chart_window(hourly, hours):
+    """Hours shown in the charts: `hours` hours from the last 00:00 or 12:00
+    local time, so the chart also shows the past few hours. Returns the rows
+    (stamped at the end of their hour) and {start, end, now} for the axis."""
+    now = datetime.now(TZ)
+    start = pd.Timestamp(now.replace(hour=0 if now.hour < 12 else 12, minute=0, second=0,
+                                     microsecond=0)).tz_convert("UTC")
+    end = start + pd.Timedelta(hours=hours)   # absolute hours, right across a DST change
+    rows = hourly[(hourly.index > start) & (hourly.index <= end)]
+    return rows, {"start": start.tz_convert(TZ).isoformat(), "end": end.tz_convert(TZ).isoformat(),
+                  "now": now.isoformat(timespec="minutes")}
+
+
 def _r(x, nd=1):
     return None if pd.isna(x) else round(float(x), nd)
 
@@ -282,14 +295,14 @@ def _r(x, nd=1):
 # Views — plain dicts, the payload a display would receive
 # ---------------------------------------------------------------------------
 
-def home_view(run, hourly, daily, point, pv, hours=48, days=5):
-    """Now (temperature, icon), today's PV estimate, next `hours` of
-    temperature and rain/snow, and a `days` daily outlook."""
+def home_view(run, hourly, daily, point, pv, hours=39, days=5):
+    """Now (temperature, icon), today's PV estimate, `hours` of temperature
+    and rain/snow from the last 00:00 / 12:00, and a `days` daily outlook."""
     pv_kw = pv_power(hourly, point["lat"], point["lon"], **pv)
     today = datetime.now(TZ).date()
     on_today = pv_kw.index.date == today
     now = _now_row(hourly)
-    nxt = _upcoming(hourly, hours)
+    nxt, chart = _chart_window(hourly, hours)
     snow = snow_fraction(nxt, point["alt"])
     return {
         "view": "home", "name": point["name"], "run": run_time(run).isoformat(),
@@ -310,15 +323,18 @@ def home_view(run, hourly, daily, point, pv, hours=48, days=5):
             "snow_mm": [_r(v) for v in nxt["rre150h0"] * snow],
             "prob": [int(v) for v in nxt["rp0003i0"]],
         },
+        "chart": chart,
         "days": _days(hourly, daily, days),
     }
 
 
-def boat_view(run, hourly, point, hours=48):
-    """Hourly wind (knots) with 10–90 % range, gusts, direction for `hours`."""
-    nxt = _upcoming(hourly, hours)
+def boat_view(run, hourly, point, hours=39):
+    """Hourly wind (knots) with 10–90 % range, gusts, direction for `hours`
+    from the last 00:00 / 12:00, and a summary of the next 12 hours."""
+    nxt, chart = _chart_window(hourly, hours)
     kt = lambda col: [_r(v * KMH_TO_KT) for v in nxt[col]]
     now = _now_row(hourly)
+    n12 = _upcoming(hourly, 12) * KMH_TO_KT
     return {
         "view": "boat", "name": point["name"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "wind_kt": _r(now["fu3010h0"] * KMH_TO_KT),
@@ -331,21 +347,27 @@ def boat_view(run, hourly, point, hours=48):
             "dir": [int(v) for v in nxt["dkl010h0"]],
             "icon": [int(v) for v in nxt["jww003i0"]],
         },
+        "chart": chart,
+        "next_12h": {"wind_min_kt": _r(n12["fu3010h0"].min()), "wind_max_kt": _r(n12["fu3010h0"].max()),
+                     "gust_max_kt": _r(n12["fu3010h1"].max()), "gust_q90_max_kt": _r(n12["fu3q90h1"].max())},
     }
 
 
-def chalet_view(run, hourly, daily, point, bulletin=None, hours=48, days=5):
-    """Now, snowfall estimate and sunshine for `hours`, daily snow/sun/min/max
-    for `days`, plus the avalanche bulletin summary if given."""
+def chalet_view(run, hourly, daily, point, bulletin=None, hours=39, days=5):
+    """Now, new snow and sunshine over the next 48 h, `hours` of snow, rain,
+    sunshine and temperature from the last 00:00 / 12:00, daily snow/sun/
+    min/max for `days`, plus the avalanche bulletin summary if given."""
     snow = snow_fraction(hourly, point["alt"])
     snow_cm = hourly["rre150h0"] * snow          # ~1 cm fresh snow per mm water
-    nxt = _upcoming(hourly, hours)
+    nxt, chart = _chart_window(hourly, hours)
+    next48 = _upcoming(hourly, 48)
     now = _now_row(hourly)
     return {
         "view": "chalet", "name": point["name"], "alt": point["alt"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
                 "freezing_m": int(now["zprfr0hs"])},
-        "snow_next_cm": _r(snow_cm[nxt.index].sum()),
+        "snow_next_cm": _r(snow_cm[next48.index].sum()),
+        "sun_next_h": _r(next48["sre000h0"].sum() / 60),
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
@@ -354,6 +376,7 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=48, days=5):
             "sun_min": [int(v) for v in nxt["sre000h0"]],
             "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
         },
+        "chart": chart,
         "days": _days(hourly, daily, days, snow_cm),
         "avalanche": bulletin,
     }
@@ -368,12 +391,13 @@ def wind_chill(temp, kmh):
     return np.where((temp <= 10) & (kmh > 4.8), np.minimum(wc, temp), temp)
 
 
-def mountain_view(run, hourly, daily, point, hours=48, days=5):
+def mountain_view(run, hourly, daily, point, hours=39, days=5):
     """Summit forecast: now (temperature, felt temperature, wind in km/h,
-    0° level), the next `hours` of wind with its 10–90 % range, gusts,
-    direction and temperature, and a daily outlook with new snow."""
+    0° level), `hours` of wind with its 10–90 % range, gusts, direction and
+    temperature from the last 00:00 / 12:00, and a daily outlook with new snow."""
     snow_cm = hourly["rre150h0"] * snow_fraction(hourly, point["alt"])
-    nxt = _upcoming(hourly, hours)
+    nxt, chart = _chart_window(hourly, hours)
+    next48 = _upcoming(hourly, 48)
     now = _now_row(hourly)
     return {
         "view": "mountain", "name": point["name"], "alt": point["alt"],
@@ -382,7 +406,7 @@ def mountain_view(run, hourly, daily, point, hours=48, days=5):
                 "feels": _r(float(wind_chill(now["tre200h0"], now["fu3010h0"]))),
                 "wind_kmh": _r(now["fu3010h0"], 0), "gust_kmh": _r(now["fu3010h1"], 0),
                 "dir": int(now["dkl010h0"]), "freezing_m": int(now["zprfr0hs"])},
-        "snow_next_cm": _r(snow_cm[nxt.index].sum()),
+        "snow_next_cm": _r(snow_cm[next48.index].sum()),
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
@@ -393,6 +417,7 @@ def mountain_view(run, hourly, daily, point, hours=48, days=5):
             "dir": [int(v) for v in nxt["dkl010h0"]],
             "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
         },
+        "chart": chart,
         "days": _days(hourly, daily, days, snow_cm),
     }
 

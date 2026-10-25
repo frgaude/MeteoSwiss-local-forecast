@@ -11,12 +11,13 @@ drawn in colour for the notebooks.
     img = render(home, view, colour=True)   # colour preview
 """
 import math
-from datetime import datetime
+import textwrap
+from datetime import datetime, timedelta
 
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.dates import DateFormatter, HourLocator
+from matplotlib.dates import HourLocator, num2date
 from matplotlib.patches import Polygon, Rectangle
 from PIL import Image
 
@@ -73,22 +74,36 @@ def _times(hourly):
     return [datetime.fromisoformat(t) for t in hourly["time"]]
 
 
-def _time_axis(ax, times):
-    ax.xaxis.set_major_locator(HourLocator(byhour=[0, 12], tz=lf.TZ))
-    ax.xaxis.set_major_formatter(DateFormatter("%a %Hh", tz=lf.TZ))
-    ax.xaxis.set_minor_locator(HourLocator(byhour=[6, 18], tz=lf.TZ))
-    ax.set_xlim(times[0], times[-1])
-    ax.grid(axis="x", which="both", color=P["GRID"], lw=1)
+def _hour_starts(times):
+    """Values are stamped at the end of their hour: bars start an hour earlier."""
+    return [t - timedelta(hours=1) for t in times]
+
+
+def _time_axis(ax, chart):
+    """Chart window from the view (last 00:00 / 12:00 + 39 h): a tick every
+    3 h labelled "15h" (the weekday at midnight), gridlines at 00:00 and
+    12:00, and a line at the time the screen was drawn."""
+    start, end = datetime.fromisoformat(chart["start"]), datetime.fromisoformat(chart["end"])
+    ax.set_xlim(start, end)
+    ax.xaxis.set_major_locator(HourLocator(byhour=range(0, 24, 3), tz=lf.TZ))
+    ax.xaxis.set_major_formatter(
+        lambda x, _: f"{d:%a}" if (d := num2date(x, tz=lf.TZ)).hour == 0 else f"{d:%H}h")
+    t = start
+    while t <= end:
+        if t.astimezone(lf.TZ).hour in (0, 12):
+            ax.axvline(t, color=P["GRID"], lw=1, zorder=0)
+        t += timedelta(hours=1)
+    ax.axvline(datetime.fromisoformat(chart["now"]), color=P["INK"], lw=2, zorder=6)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    ax.tick_params(length=0, which="both")
+    ax.tick_params(axis="x", length=4, labelsize=11)
+    ax.tick_params(axis="y", length=0)
 
 
 def _shade_nights(ax, times):
-    for t in times:
+    for t in _hour_starts(times):
         if t.hour < 7 or t.hour >= 19:
-            ax.axvspan(t - np.timedelta64(30, "m"), t + np.timedelta64(30, "m"),
-                       color=P["NIGHT"], lw=0, zorder=0)
+            ax.axvspan(t, t + timedelta(hours=1), color=P["NIGHT"], lw=0, zorder=0)
 
 
 def _precip_scale(ax, totals):
@@ -151,7 +166,9 @@ def home(view):
     # now: icon + forecast temperature for this hour
     _icon(fig, now["icon"], 10, 360, 120)
     _text(fig, 140, 410, _deg(now['temp']), 60, weight="bold")
-    _text(fig, 144, 378, lf.icon_text(now["icon"]), 13, P["MUTED"])
+    # description on up to two lines, so it stays clear of the solar block
+    for i, line in enumerate(textwrap.wrap(lf.icon_text(now["icon"]), 34)[:2]):
+        _text(fig, 144, 378 - 18 * i, line, 13, P["MUTED"])
 
     # solar: today's estimated energy + hourly profile
     _label(fig, 470, 462, "solar today (est.)")
@@ -175,13 +192,14 @@ def home(view):
     t = _times(h)
     ax = _axes(fig, 62, 175, 830, 170)
     _shade_nights(ax, t)
-    ax.bar(t, h["rain_mm"], width=1 / 26, color=P["RAIN"], label="rain")
-    ax.bar(t, h["snow_mm"], bottom=h["rain_mm"], width=1 / 26, color=P["SNOW"],
+    tb = _hour_starts(t)
+    ax.bar(tb, h["rain_mm"], width=0.9 / 24, align="edge", color=P["RAIN"], label="rain")
+    ax.bar(tb, h["snow_mm"], bottom=h["rain_mm"], width=0.9 / 24, align="edge", color=P["SNOW"],
            label="snow" if any(h["snow_mm"]) else None)
     _precip_scale(ax, [r + s for r, s in zip(h["rain_mm"], h["snow_mm"])])
     ax.set_ylabel("mm/h", fontsize=11)
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
-    _time_axis(ax, t)
+    _time_axis(ax, view["chart"])
     _temp_axis(ax, t, h["temp"])
 
     # daily outlook
@@ -208,9 +226,9 @@ def _compass(fig, x, y, size, direction):
     ax.set_ylim(0, 1)
 
 
-def _wind_chart(ax, t, mean, q10, q90, gust, dirs, unit, top, step, arrows_at=0.83):
-    """Mean wind with its 10–90 % band, gusts, and direction arrows every 3 h
-    at `arrows_at` of the axis height."""
+def _wind_chart(ax, chart, t, mean, q10, q90, gust, dirs, unit, top, step, arrows_at=0.83):
+    """Mean wind with its 10–90 % band, gusts, and direction arrows on the
+    3-hour ticks at `arrows_at` of the axis height."""
     _shade_nights(ax, t)
     ax.fill_between(t, q10, q90, color=P["BAND"], lw=0, label="10–90 %")
     ax.plot(t, mean, color=P["WIND"], lw=3, label="mean wind")
@@ -221,8 +239,8 @@ def _wind_chart(ax, t, mean, q10, q90, gust, dirs, unit, top, step, arrows_at=0.
         ax.axhline(lvl, color=P["GRID"], lw=1, zorder=0)
     ax.set_yticks(levels)
     ax.set_ylabel(unit, fontsize=12)
-    _time_axis(ax, t)
-    for ti, d in list(zip(t, dirs))[1::3]:
+    _time_axis(ax, chart)
+    for ti, d in [(ti, d) for ti, d in zip(t, dirs) if ti.hour % 3 == 0]:
         ax.text(ti, top * arrows_at, "↓", rotation=-d, ha="center", va="center", fontsize=18,
                 weight="bold", color=P["INK"])
 
@@ -241,18 +259,17 @@ def boat(view):
 
     # summary for the next 12 h
     t = _times(h)
-    nxt12 = slice(0, 12)
+    n12 = view["next_12h"]
     _label(fig, 370, 462, "next 12 h")
-    _text(fig, 370, 428, f"mean {min(h['wind_kt'][nxt12]):.0f}–{max(h['wind_kt'][nxt12]):.0f} kt", 20,
-          weight="bold")
-    _text(fig, 370, 400, f"max gust {max(h['gust_kt'][nxt12]):.0f} kt", 15)
-    _text(fig, 370, 375, f"up to {max(h['gust_q90_kt'][nxt12]):.0f} kt at 90 %", 13, P["MUTED"])
+    _text(fig, 370, 428, f"mean {n12['wind_min_kt']:.0f}–{n12['wind_max_kt']:.0f} kt", 20, weight="bold")
+    _text(fig, 370, 400, f"max gust {n12['gust_max_kt']:.0f} kt", 15)
+    _text(fig, 370, 375, f"up to {n12['gust_q90_max_kt']:.0f} kt at 90 %", 13, P["MUTED"])
     _icon(fig, now["icon"], W - 115, 365, 100)
     _text(fig, W - 120, 395, _deg(now['temp']), 26, weight="bold", ha="right")
 
     # 48 h wind: mean with 10–90 % band, gusts, direction
     ax = _axes(fig, 52, 42, 893, 300)
-    _wind_chart(ax, t, h["wind_kt"], h["wind_q10_kt"], h["wind_q90_kt"], h["gust_kt"], h["dir"],
+    _wind_chart(ax, view["chart"], t, h["wind_kt"], h["wind_q10_kt"], h["wind_q90_kt"], h["gust_kt"], h["dir"],
                 "kt", top=max(max(h["gust_q90_kt"]), 15) * 1.18, step=10)
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=3, handlelength=1.5)
     return fig
@@ -322,7 +339,7 @@ def chalet(view):
     snow = f"{view['snow_next_cm']:.0f}"
     _text(fig, 330, 412, snow, 42, weight="bold")
     _text(fig, 336 + 32 * len(snow), 412, "cm", 15, P["MUTED"])
-    _text(fig, 330, 380, f"sunshine 48 h: {sum(h['sun_min']) / 60:.0f} h", 13, P["MUTED"])
+    _text(fig, 330, 380, f"sunshine 48 h: {view['sun_next_h']:.0f} h", 13, P["MUTED"])
 
     # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
     # exposure star and altitude mountain of the main avalanche problem
@@ -353,19 +370,21 @@ def chalet(view):
     # 48 h: sunshine strip on top, then snowfall bars and temperature line
     t = _times(h)
     sx = _axes(fig, 62, 318, 830, 26)
-    sx.bar(t, h["sun_min"], width=1 / 26, color=P["SUN"])
+    tb = _hour_starts(t)
+    sx.bar(tb, h["sun_min"], width=0.9 / 24, align="edge", color=P["SUN"])
     sx.set_ylim(0, 60)
-    sx.set_xlim(t[0], t[-1])
+    sx.set_xlim(datetime.fromisoformat(view["chart"]["start"]), datetime.fromisoformat(view["chart"]["end"]))
     sx.axis("off")
     _text(fig, 18, 324, "sun", 11, P["MUTED"], weight="bold")
     ax = _axes(fig, 62, 165, 830, 145)
     _shade_nights(ax, t)
-    ax.bar(t, h["snow_cm"], width=1 / 26, color=P["SNOW"],
+    ax.bar(tb, h["snow_cm"], width=0.9 / 24, align="edge", color=P["SNOW"],
            label="snow cm" if any(h["snow_cm"]) else None)
-    ax.bar(t, h["rain_mm"], bottom=h["snow_cm"], width=1 / 26, color=P["RAIN"], label="rain mm")
+    ax.bar(tb, h["rain_mm"], bottom=h["snow_cm"], width=0.9 / 24, align="edge", color=P["RAIN"],
+           label="rain mm")
     _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
-    _time_axis(ax, t)
+    _time_axis(ax, view["chart"])
     ax2 = _temp_axis(ax, t, h["temp"], lo=0)
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
 
@@ -405,7 +424,7 @@ def mountain(view):
     ax = _axes(fig, 62, 165, 830, 180)
     # headroom above the data for the legend and the direction arrows
     top = max(max(h["gust_kmh"]), max(h["wind_q90_kmh"]), 30) * 1.5
-    _wind_chart(ax, t, h["wind_kmh"], h["wind_q10_kmh"], h["wind_q90_kmh"], h["gust_kmh"], h["dir"],
+    _wind_chart(ax, view["chart"], t, h["wind_kmh"], h["wind_q10_kmh"], h["wind_q90_kmh"], h["gust_kmh"], h["dir"],
                 "km/h", top=top, step=20 if top > 60 else 10, arrows_at=0.76)
     ax2 = _temp_axis(ax, t, h["temp"], ls="--")
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")

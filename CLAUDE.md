@@ -32,6 +32,11 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   SLF region CH-4124 Val d'Anniviers; mountain Le Toûno 1119/3 (point of
   interest, 3018 m; `find_point` ignores accents, "touno" finds it).
 - PV: the placeholder (10 kWp, 30°, south) stays until the user says otherwise.
+- Charts (all screens): 39 h from the last local 00:00 / 12:00 (so the past
+  hours show too), a tick every 3 h (weekday at midnight), gridlines at
+  00:00 / 12:00, a vertical line at render time (`lf._chart_window`,
+  `screens._time_axis`). Summaries (next 12 h, new snow / sunshine 48 h) still
+  count from now. Wind quantiles exist only from the run time on.
 - Outlook: home and chalet share the daily pane (`lf._days`,
   `screens._daily`); the 6 half-day outlook was dropped on 23 Oct 2026.
 - Colour (notebooks) is for charts and icons only: numbers stay in the text
