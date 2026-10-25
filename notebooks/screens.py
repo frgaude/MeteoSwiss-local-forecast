@@ -237,17 +237,39 @@ def _beaufort(kt):
     return int(np.searchsorted([1, 4, 7, 11, 17, 22, 28, 34, 41, 48, 56, 64], kt, side="right"))
 
 
-def _compass(fig, x, y, size, direction):
-    """Compass with an arrow blowing from `direction` (degrees)."""
-    ax = _axes(fig, x, y, size, size, projection="polar")
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-    ax.set_yticks([])
-    ax.set_xticks(np.radians(range(0, 360, 90)), ["N", "E", "S", "W"], fontsize=11)
-    ax.tick_params(pad=-2)
-    ax.annotate("", xy=(np.radians(direction + 180), 0.9), xytext=(np.radians(direction), 0.9),
-                arrowprops=dict(arrowstyle="-|>,head_width=0.5,head_length=0.8", color=P["WIND"], lw=3.5))
-    ax.set_ylim(0, 1)
+POINTS16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+
+
+def _wind_dial(fig, x, y, size, direction, speed, unit):
+    """Wind dial: a ring with ticks every 22.5° and the 8 compass points, a
+    pointer on the ring where the wind comes from (pointing in), and in the
+    centre the direction in words, the speed and its unit."""
+    ax = _axes(fig, x, y, size, size)
+    ax.set_xlim(-1.32, 1.32)
+    ax.set_ylim(-1.32, 1.32)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    for r, c in ((1.0, P["INK"]), (0.74, P["GRID"])):
+        ax.add_patch(plt.Circle((0, 0), r, fc="none", ec=c, lw=1.2))
+    for i in range(16):
+        a = np.radians(90 - i * 22.5)
+        inner = 0.86 if i % 4 == 0 else 0.92
+        ax.plot([inner * np.cos(a), np.cos(a)], [inner * np.sin(a), np.sin(a)], color=P["INK"],
+                lw=1.2 if i % 4 == 0 else 0.8)
+        if i % 2 == 0:
+            ax.text(1.18 * np.cos(a), 1.18 * np.sin(a), POINTS16[i], ha="center", va="center",
+                    fontsize=9, weight="bold", color=P["MUTED"])
+    a, w = np.radians(90 - direction), np.radians(9)
+    ax.add_patch(Polygon([(0.76 * np.cos(a), 0.76 * np.sin(a)),
+                          (0.99 * np.cos(a - w), 0.99 * np.sin(a - w)),
+                          (0.99 * np.cos(a + w), 0.99 * np.sin(a + w))],
+                         closed=True, fc=P["WIND"], ec=P["WIND"], lw=1, joinstyle="round"))
+    ax.text(0, 0.40, POINTS16[round(direction / 22.5) % 16], ha="center", va="center", fontsize=11,
+            weight="bold", color=P["MUTED"])
+    ax.text(0, -0.02, f"{speed:.0f}", ha="center", va="center", fontsize=26, weight="bold",
+            color=P["INK"])
+    ax.text(0, -0.44, unit, ha="center", va="center", fontsize=10, color=P["MUTED"])
 
 
 def _wind_chart(ax, chart, t, mean, q10, q90, gust, dirs, unit, top, step, arrows_at=0.83):
@@ -274,17 +296,16 @@ def boat(view):
     _header(fig, view)
     now, h = view["now"], view["hourly"]
 
-    # now: wind, gust, direction compass
-    _text(fig, 16, 405, f"{now['wind_kt']:.0f}", 66, weight="bold")
-    _text(fig, 22 + 50 * len(f"{now['wind_kt']:.0f}"), 405, "kt", 18, P["MUTED"])
-    _text(fig, 18, 372, f"gusts {now['gust_kt']:.0f} kt · Bft {_beaufort(now['wind_kt'])}", 14,
-          P["MUTED"])
-    _compass(fig, 205, 362, 110, now["dir"])
+    # now: wind dial (direction and mean speed), gusts and Beaufort beside it
+    _wind_dial(fig, 10, 352, 140, now["dir"], now["wind_kt"], "kt")
+    _label(fig, 170, 468, "gusts")
+    _value_unit(fig, 170, 412, f"{now['gust_kt']:.0f}", "kt", 40)
+    _text(fig, 170, 380, f"Beaufort {_beaufort(now['wind_kt'])}", 13, P["MUTED"])
 
     # summary for the next 12 h
     t = _times(h)
     n12 = view["next_12h"]
-    _label(fig, 370, 462, "next 12 h")
+    _label(fig, 370, 468, "next 12 h")
     _text(fig, 370, 428, f"mean {n12['wind_min_kt']:.0f}–{n12['wind_max_kt']:.0f} kt", 20, weight="bold")
     _text(fig, 370, 400, f"max gust {n12['gust_max_kt']:.0f} kt", 15)
     _text(fig, 370, 375, f"up to {n12['gust_q90_max_kt']:.0f} kt at 90 %", 13, P["MUTED"])

@@ -11,6 +11,9 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
   today, 48 h temperature + rain/snow, 5-day outlook (same pane as chalet,
   with precipitation instead of new snow).
 - Boat: wind in knots: mean with 10–90 % range, gusts, direction (Lake Geneva).
+  Now shown as a wind dial (`screens._wind_dial`: ring, 8 points, pointer where
+  the wind comes from, 16-point name + speed in the centre, no degrees), with
+  gusts and Beaufort beside it.
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
 - Mountain (Le Toûno): top panel shared with the chalet
