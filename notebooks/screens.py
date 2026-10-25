@@ -435,9 +435,10 @@ def _snow_avalanche_panel(fig, view):
         if main:
             _text(fig, 660, 412, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
             _aspect_rose(fig, 800, 393, 76, main["aspects"])
-            _altitude_mountain(fig, 886, 407, 58, 48, main["above_m"], main["below_m"])
+            # the mountain and its altitude form one pictogram, centred on the big figures
+            _altitude_mountain(fig, 888, 414, 54, 42, main["above_m"], main["below_m"])
             if main["above_m"] or main["below_m"]:
-                _text(fig, 915, 380, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                _text(fig, 915, 400, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
                       ha="center")
         until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
         _text(fig, 590, 380, f"until {until:%a %H:%M}", 12, P["MUTED"])
