@@ -25,6 +25,7 @@ import screens  # noqa: E402
 # ── Configuration (same as the notebooks' configuration cells) ──────────────
 HOME = (102000, 2)        # Renens VD
 BOAT = (109500, 2)        # Lutry, lake shore
+WIND_STATION = "CHVD19"   # WindSpots: Lutry - Port du Vieux-Stand, measured wind
 CHALET = (396123, 2)      # Chandolin, 1900 m
 MOUNTAIN = (1119, 3)      # Le Toûno, 3018 m (point of interest)
 SLF_REGION = "CH-4124"    # Val d'Anniviers
@@ -48,7 +49,8 @@ def main(out):
     station = lf.slf_station(SLF_STATION)     # measured snow, None if unavailable
     views = {
         "home": (screens.home, lf.home_view(run, *data[HOME], lf.point_info(HOME), PV)),
-        "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT))),
+        "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT),
+                                            lf.windspots_station(WIND_STATION))),
         "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin, station)),
         "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN), bulletin, station)),
     }

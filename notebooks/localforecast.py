@@ -25,6 +25,7 @@ COLLECTION = "ch.meteoschweiz.ogd-local-forecasting"
 POINTS_URL = f"https://data.geo.admin.ch/{COLLECTION}/ogd-local-forecasting_meta_point.csv"
 SLF_URL = "https://aws.slf.ch/api/bulletin/caaml/{lang}/json"
 SLF_IMIS = "https://measurement-api.slf.ch/public/api/imis/"
+WINDSPOTS = "https://api.windspots.org/mobile/"
 ICONS_URL = ("https://raw.githubusercontent.com/MeteoSwiss/opendata-localforecast-demos/"
              "main/notebooks/icons/")
 
@@ -343,13 +344,35 @@ def home_view(run, hourly, daily, point, pv, hours=39, days=5):
     }
 
 
-def boat_view(run, hourly, point, hours=39):
+def windspots_station(code="CHVD19"):
+    """Latest measurement at a WindSpots station (CHVD19 = Lutry - Port du
+    Vieux-Stand): {name, time, status, wind_kt, gust_kt, dir, dir_name,
+    water_c, gust_max_12h_kt}, or None if the station cannot be read.
+    WindSpots gives speeds in km/h and local times."""
+    try:
+        info = next(s for s in requests.get(WINDSPOTS + "stationinfo.json", timeout=30)
+                    .json()["stationInfo"] if s["stationName"] == code)
+        hist = requests.get(WINDSPOTS + "stationdata.json", params={"station": code, "duration": 12},
+                            timeout=30).json()["stationData"]["windChart"]["serie"]["points"]
+    except (requests.RequestException, ValueError, KeyError, TypeError, StopIteration):
+        return None
+    num = lambda v: float(v) if v not in (None, "") else None
+    gusts = [num(p["gust"]) for p in hist if num(p.get("gust")) is not None]
+    return {"name": info["displayName"], "status": info["status"],
+            "time": pd.Timestamp(info["dataTime"]).tz_localize(TZ).isoformat(timespec="minutes"),
+            "wind_kt": _r(num(info["speed"]) * KMH_TO_KT), "gust_kt": _r(num(info["gust"]) * KMH_TO_KT),
+            "dir": int(info["direction"]), "dir_name": info["directionAlpha"],
+            "water_c": num(info.get("water")),
+            "gust_max_12h_kt": _r(max(gusts) * KMH_TO_KT) if gusts else None}
+
+
+def boat_view(run, hourly, point, measured=None, hours=39):
     """Hourly wind (knots) with 10–90 % range, gusts, direction for `hours`
-    from the last 00:00 / 12:00, and a summary of the next 12 hours."""
+    from the last 00:00 / 12:00, and the latest measurement at a WindSpots
+    station (`windspots_station`) if given."""
     nxt, chart = _chart_window(hourly, hours)
     kt = lambda col: [_r(v * KMH_TO_KT) for v in nxt[col]]
     now = _now_row(hourly)
-    n12 = _upcoming(hourly, 12) * KMH_TO_KT
     return {
         "view": "boat", "name": point["name"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "wind_kt": _r(now["fu3010h0"] * KMH_TO_KT),
@@ -363,8 +386,7 @@ def boat_view(run, hourly, point, hours=39):
             "icon": [int(v) for v in nxt["jww003i0"]],
         },
         "chart": chart,
-        "next_12h": {"wind_min_kt": _r(n12["fu3010h0"].min()), "wind_max_kt": _r(n12["fu3010h0"].max()),
-                     "gust_max_kt": _r(n12["fu3010h1"].max()), "gust_q90_max_kt": _r(n12["fu3q90h1"].max())},
+        "measured": measured,
     }
 
 

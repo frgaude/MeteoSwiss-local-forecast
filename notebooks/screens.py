@@ -302,15 +302,28 @@ def boat(view):
     _value_unit(fig, 170, 412, f"{now['gust_kt']:.0f}", "kt", 40)
     _text(fig, 170, 380, f"Beaufort {_beaufort(now['wind_kt'])}", 13, P["MUTED"])
 
-    # summary for the next 12 h
+    # measured at the port (WindSpots), not forecast: mean / gust, direction,
+    # water temperature and the strongest gust of the last 12 h
     t = _times(h)
-    n12 = view["next_12h"]
-    _label(fig, 370, 468, "next 12 h")
-    _text(fig, 370, 428, f"mean {n12['wind_min_kt']:.0f}–{n12['wind_max_kt']:.0f} kt", 20, weight="bold")
-    _text(fig, 370, 400, f"max gust {n12['gust_max_kt']:.0f} kt", 15)
-    _text(fig, 370, 375, f"up to {n12['gust_q90_max_kt']:.0f} kt at 90 %", 13, P["MUTED"])
+    m = view.get("measured")
+    when = datetime.fromisoformat(m["time"]) if m else None
+    stale = (not m or m["status"] != "green"
+             or datetime.now(lf.TZ) - when > timedelta(hours=2))
+    _label(fig, 370, 468, f"measured · Lutry port (WindSpots){f' · {when:%H:%M}' if m else ''}")
+    if stale:
+        _text(fig, 370, 412, "no recent measurement", 15)
+        if m:
+            _text(fig, 370, 380, f"last {when:%a %H:%M} · station {m['status']}", 13, P["MUTED"])
+    else:
+        _value_unit(fig, 370, 412, f"{m['wind_kt']:.0f} / {m['gust_kt']:.0f}", "kt", 40)
+        small = ["mean / gust", m["dir_name"]]
+        if m["water_c"] is not None:
+            small.append(f"water {m['water_c']:.1f}°")
+        if m["gust_max_12h_kt"] is not None:
+            small.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt")
+        _text(fig, 370, 380, " · ".join(small), 13, P["MUTED"])
     _icon(fig, now["icon"], W - 115, 365, 100)
-    _text(fig, W - 120, 395, _deg(now['temp']), 26, weight="bold", ha="right")
+    _text(fig, W - 120, 425, _deg(now['temp']), 26, weight="bold", ha="right")
 
     # 48 h wind: mean with 10–90 % band, gusts, direction
     ax = _axes(fig, 52, 42, 893, 300)
