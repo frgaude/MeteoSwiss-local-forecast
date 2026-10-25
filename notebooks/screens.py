@@ -335,9 +335,10 @@ def _snow_rain_temp(ax, view):
     ax.bar(tb, h["snow_cm"], width=0.9 / 24, align="edge", color=P["SNOW"],
            label="snow cm" if any(h["snow_cm"]) else None)
     ax.bar(tb, h["rain_mm"], bottom=h["snow_cm"], width=0.9 / 24, align="edge", color=P["RAIN"],
-           label="rain mm")
+           label="rain mm" if any(h["rain_mm"]) else None)
     _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
-    ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
+    if ax.get_legend_handles_labels()[0]:     # only what is forecast
+        ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
     _time_axis(ax, view["chart"])
     ax2 = _temp_axis(ax, t, h["temp"], lo=0)
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
