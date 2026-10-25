@@ -134,6 +134,13 @@ def _header(fig, view, extra=""):
     _text(fig, W - 16, H - 32, f"forecast run {run:%a %H:%M}{extra}", 12, P["MUTED"], ha="right")
 
 
+def _value_unit(fig, x, y, value, unit, size):
+    """Big bold value with its unit right after it, placed from the drawn width."""
+    t = fig.text(x / W, y / H, value, fontsize=size, color=P["INK"], weight="bold")
+    right = t.get_window_extent(renderer=fig.canvas.get_renderer()).x1
+    _text(fig, right + 5, y, unit, 15, P["MUTED"])
+
+
 def _label(fig, x, y, s):
     _text(fig, x, y, s.upper(), 11, P["MUTED"], weight="bold")
 
@@ -390,19 +397,15 @@ def _snow_avalanche_panel(fig, view):
     _text(fig, 118, 412, _deg(now['temp']), 50, weight="bold")
     _text(fig, 121, 380, f"0° level {now['freezing_m']} m", 13, P["MUTED"])
 
-    # measured, not forecast: snow depth and new snow over 24 h at the station
+    # measured, not forecast: SLF new snow over 24 h / 3 days, and snow depth
     st = view.get("station")
+    _label(fig, 300, 462, "new snow 24 h / 3 days (SLF)")
     if st:
-        _label(fig, 330, 462, f"{st['name']} {st['alt']:.0f} m · SLF")
-        depth = f"{st['depth_cm']:.0f}"
-        _text(fig, 330, 412, depth, 42, weight="bold")
-        _text(fig, 338 + 36 * len(depth), 412, "cm", 15, P["MUTED"])
-        new = (f"+{st['new_24h_cm']:.0f} cm new in 24 h" if st["new_24h_cm"] >= 0.5
-               else "no new snow in 24 h")
-        _text(fig, 330, 380, f"{new} · {datetime.fromisoformat(st['time']):%H:%M}", 13, P["MUTED"])
+        _value_unit(fig, 300, 412, f"{st['new_24h_cm']:.0f} / {st['new_3d_cm']:.0f}", "cm", 40)
+        _text(fig, 300, 380, f"depth {st['depth_cm']:.0f} cm · {st['name']} {st['alt']:.0f} m", 12,
+              P["MUTED"])
     else:
-        _label(fig, 330, 462, "snow measured (SLF)")
-        _text(fig, 330, 412, "no data", 15)
+        _text(fig, 300, 412, "no data", 15)
 
     # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
     # exposure star and altitude mountain of the main avalanche problem

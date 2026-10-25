@@ -472,25 +472,32 @@ def slf_bulletin(region_id, lang="en", active_at=None):
 
 def slf_station(code="ANV2"):
     """Measured snow at an SLF IMIS station (ANV2 = Orzival, 2640 m, Val
-    d'Anniviers): {name, alt, time, depth_cm, new_24h_cm}, or None if the
-    station or its snow sensor gives nothing.
+    d'Anniviers): {name, alt, date, new_24h_cm, new_3d_cm, depth_cm, time},
+    or None if the station gives no snow data.
 
-    The API returns the last 24 h of half-hourly snow depth (HS). New snow is
-    the sum of the rises in depth (hourly means, smoothed over 3 h), so snow
-    that fell and then settled or melted still counts; it is an estimate."""
+    New snow is SLF's own daily value (HN_1D, from their snowpack model, so
+    settling is accounted for): the latest day, and the sum of the last
+    three. The depth is the latest half-hourly measurement (HS)."""
     try:
         meta = next(s for s in requests.get(SLF_IMIS + "stations", timeout=30).json()
                     if s["code"] == code)
-        rows = requests.get(f"{SLF_IMIS}station/{code}/measurements", timeout=30).json()
+        days = [d for d in requests.get(SLF_IMIS + "daily-snow", params={"period_in_days": 3},
+                                        timeout=30).json()
+                if d["station_code"] == code and d["HN_1D"] is not None]
+        now = [m for m in requests.get(f"{SLF_IMIS}station/{code}/measurements", timeout=30).json()
+               if m["HS"] is not None]
     except (requests.RequestException, ValueError, StopIteration):
         return None
-    hs = pd.Series({pd.Timestamp(m["measure_date"]): m["HS"] for m in rows}, dtype=float).dropna()
-    if hs.empty:
+    if not days:
         return None
-    smooth = hs.resample("1h").mean().rolling(3, min_periods=1, center=True).mean()
-    return {"name": meta["label"], "alt": meta["elevation"],
-            "time": hs.index[-1].tz_convert(TZ).isoformat(timespec="minutes"),
-            "depth_cm": _r(hs.iloc[-1]), "new_24h_cm": _r(smooth.diff().clip(lower=0).sum())}
+    days.sort(key=lambda d: d["measure_date"])
+    days = days[-3:]
+    last = now[-1] if now else None
+    return {"name": meta["label"], "alt": meta["elevation"], "date": days[-1]["measure_date"][:10],
+            "new_24h_cm": _r(days[-1]["HN_1D"]), "new_3d_cm": _r(sum(d["HN_1D"] for d in days)),
+            "depth_cm": _r(last["HS"] if last else days[-1]["HS"]),
+            "time": (pd.Timestamp(last["measure_date"]).tz_convert(TZ).isoformat(timespec="minutes")
+                     if last else None)}
 
 
 def slf_regions(lang="en", active_at="2026-02-15T10:00:00Z"):
