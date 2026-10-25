@@ -40,7 +40,8 @@ def main(out):
                     | set(lf.MOUNTAIN_PARAMS))
     run, data = lf.fetch([HOME, BOAT, CHALET, MOUNTAIN], params)
     try:
-        bulletin = lf.slf_bulletin(SLF_REGION)
+        # a past time (ISO, UTC) shows the bulletin valid then, for testing the layout
+        bulletin = lf.slf_bulletin(SLF_REGION, active_at=os.environ.get("SLF_ACTIVE_AT") or None)
     except Exception as e:  # the screen still works without it
         print(f"SLF bulletin unavailable: {e}")
         bulletin = None

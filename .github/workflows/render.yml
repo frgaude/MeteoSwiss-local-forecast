@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: "12,32,52 * * * *"
   workflow_dispatch:
+    inputs:
+      slf_active_at:
+        description: "Test only: show the SLF bulletin valid at this UTC time (e.g. 2026-10-25T16:00:00Z)"
+        required: false
+        default: ""
   push:
     branches: [main]
     paths: ["render.py", "notebooks/*.py", "requirements.txt", ".github/workflows/render.yml"]
@@ -42,6 +47,8 @@ jobs:
           path: data/local_forecast/icons
           key: icons-v1
       - run: python render.py site
+        env:
+          SLF_ACTIVE_AT: ${{ inputs.slf_active_at }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
