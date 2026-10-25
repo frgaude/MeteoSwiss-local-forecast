@@ -141,28 +141,30 @@ def fetch(keys, params, run=None):
     run_dir = os.path.join(OUT_DIR, run)
     os.makedirs(run_dir, exist_ok=True)
 
-    # the cache is valid for a parameter if it holds every requested point
+    # the manifest records which points each parameter's file holds; a file
+    # is reused only if it holds every requested point, else it is fetched
+    # again for the old and the new points together
     manifest_path = os.path.join(run_dir, "points.json")
-    cached = set()
+    manifest = {}
     if os.path.exists(manifest_path):
         with open(manifest_path) as f:
-            cached = {tuple(k) for k in json.load(f)}
-    if not set(keys) <= cached:
-        cached |= set(keys)
-        for p in params:
-            path = os.path.join(run_dir, f"{p}.csv")
-            if os.path.exists(path):
-                os.remove(path)
-    todo = [p for p in params if not os.path.exists(os.path.join(run_dir, f"{p}.csv"))]
+            manifest = json.load(f)
+        if isinstance(manifest, list):         # old format: one list for all parameters
+            manifest = {}
+    held = {p: {tuple(k) for k in manifest.get(p, [])} for p in params}
+    todo = [p for p in params if not set(keys) <= held[p]
+            or not os.path.exists(os.path.join(run_dir, f"{p}.csv"))]
     if todo:
         if run != latest:                      # an older run, possibly from another day's item
             urls = _day_runs(datetime.strptime(run[:8], "%Y%m%d").date())[run]
         print(f"Downloading {len(todo)} parameters for run {run} (~33 MB each, filtered)…")
+        want = {p: sorted(held[p] | set(keys)) for p in todo}
         with ThreadPoolExecutor(6) as pool:
-            list(pool.map(lambda p: _download_filtered(urls[p], sorted(cached),
+            list(pool.map(lambda p: _download_filtered(urls[p], want[p],
                                                        os.path.join(run_dir, f"{p}.csv")), todo))
+        manifest.update({p: [list(k) for k in want[p]] for p in todo})
         with open(manifest_path, "w") as f:
-            json.dump(sorted(cached), f)
+            json.dump(manifest, f)
 
     frames = {k: ({}, {}) for k in keys}
     for p in params:
