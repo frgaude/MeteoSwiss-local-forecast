@@ -39,7 +39,7 @@ BOAT_PARAMS = ["fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
 CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0",
                  "zprfr0hs", "sre000h0", "jp2000d0", "tre200pn", "tre200px"]
 MOUNTAIN_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "zprfr0hs", "sre000h0",
-                   "fu3010h0", "fu3010h1", "dkl010h0", "jp2000d0", "tre200pn", "tre200px"]
+                   "fu3010h0", "fu3010h1", "dkl010h0"]
 DAILY = {"jp2000d0", "tre200pn", "tre200px", "rka150p0", "rreq10p0", "rreq90p0"}
 
 
@@ -390,10 +390,21 @@ def wind_chill(temp, kmh):
     return np.where((temp <= 10) & (kmh > 4.8), np.minimum(wc, temp), temp)
 
 
-def mountain_view(run, hourly, daily, point, hours=39, days=5):
+def sun_events(lat, lon, start, end):
+    """Sunrise and sunset times between `start` and `end` (ISO strings), for
+    the standard horizon (sun centre 0.833° below it, for refraction); within
+    a few minutes of the times MeteoSwiss shows."""
+    t = pd.date_range(pd.Timestamp(start), pd.Timestamp(end), freq="1min")
+    zenith, _ = solar_position(t, lat, lon)
+    up = zenith < 90.833
+    return [{"time": t[i + 1].tz_convert(TZ).isoformat(timespec="minutes"), "rise": bool(up[i + 1])}
+            for i in np.flatnonzero(np.diff(up.astype(int)))]
+
+
+def mountain_view(run, hourly, point, hours=39):
     """Summit forecast: now (temperature, felt temperature, wind in km/h,
-    0° level), `hours` of snow, rain, temperature and wind from the last
-    00:00 / 12:00, and a daily outlook with new snow."""
+    0° level) and `hours` from the last 00:00 / 12:00 of wind, sunshine
+    with sunrise and sunset, snow, rain and temperature."""
     snow = snow_fraction(hourly, point["alt"])
     snow_cm = hourly["rre150h0"] * snow
     nxt, chart = _chart_window(hourly, hours)
@@ -414,10 +425,11 @@ def mountain_view(run, hourly, daily, point, hours=39, days=5):
             "rain_mm": [_r(v) for v in nxt["rre150h0"] * (1 - snow[nxt.index])],
             "wind_kmh": [_r(v) for v in nxt["fu3010h0"]],
             "dir": [int(v) for v in nxt["dkl010h0"]],
+            "sun_min": [int(v) for v in nxt["sre000h0"]],
             "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
         },
         "chart": chart,
-        "days": _days(hourly, daily, days, snow_cm),
+        "sun_events": sun_events(point["lat"], point["lon"], chart["start"], chart["end"]),
     }
 
 

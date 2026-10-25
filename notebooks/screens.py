@@ -343,6 +343,28 @@ def _snow_rain_temp(ax, view):
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
 
 
+def _sunshine(ax, view):
+    """Sunshine minutes per hour (0–60) on the chart's time scale, with
+    sunrise ("07:01 ↑") and sunset ("↓ 17:26") marked on the baseline."""
+    h = view["hourly"]
+    t = _times(h)
+    ax.bar(_hour_starts(t), h["sun_min"], width=0.9 / 24, align="edge", color=P["SUN"])
+    ax.set_ylim(0, 60)
+    ax.set_yticks([0, 30, 60])
+    ax.axhline(30, color=P["GRID"], lw=1, zorder=0)
+    ax.axhline(60, color=P["GRID"], lw=1, zorder=0)
+    _time_axis(ax, view["chart"])
+    ax.tick_params(axis="x", labelbottom=False, length=0)
+    ax.tick_params(axis="y", labelsize=10)
+    ax.text(0.01, 0.97, "sunshine min/h", transform=ax.transAxes, ha="left", va="top", fontsize=11,
+            color=P["MUTED"])
+    for e in view["sun_events"]:
+        te = datetime.fromisoformat(e["time"])
+        label = f"{te:%H:%M} ↑" if e["rise"] else f"↓ {te:%H:%M}"
+        ax.text(te, 8, label, ha="right" if e["rise"] else "left", va="bottom", fontsize=11,
+                weight="bold", color=P["INK"])
+
+
 def _wind_row(ax, view, key):
     """Wind every 3 h on the chart's time scale: an arrow blowing with the
     wind, and the mean speed under it."""
@@ -354,8 +376,7 @@ def _wind_row(ax, view, key):
         if ti.hour % 3 == 0 and v is not None:
             ax.text(ti, 0.72, "↓", rotation=-d, ha="center", va="center", fontsize=16, weight="bold",
                     color=P["INK"])
-            ax.text(ti, 0.12, f"{v:.0f}", ha="center", va="center", fontsize=12, weight="bold",
-                    color=P["INK"])
+            ax.text(ti, 0.12, f"{v:.0f}", ha="center", va="center", fontsize=12, color=P["INK"])
 
 
 def chalet(view):
@@ -441,14 +462,12 @@ def mountain(view):
     _text(fig, 650, 385, f"{abs(gap):.0f} m {'above' if gap >= 0 else 'below'} the summit", 13,
           P["MUTED"])
 
-    # chart like the chalet's, with the wind every 3 h above it (arrow + km/h),
-    # as in the MeteoSwiss app
+    # as in the MeteoSwiss app: wind every 3 h (arrow + km/h), sunshine with
+    # sunrise and sunset, then snow, rain and temperature
     _wind_row(_axes(fig, 62, 303, 830, 44), view, "wind_kmh")
     _text(fig, 18, 312, "km/h", 11, P["MUTED"], weight="bold")
-    _snow_rain_temp(_axes(fig, 62, 165, 830, 132), view)
-
-    # daily outlook
-    _daily(fig, view["days"], "snow")
+    _sunshine(_axes(fig, 62, 224, 830, 72), view)
+    _snow_rain_temp(_axes(fig, 62, 40, 830, 160), view)
     return fig
 
 

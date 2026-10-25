@@ -47,7 +47,7 @@ def main(out):
         "home": (screens.home, lf.home_view(run, *data[HOME], lf.point_info(HOME), PV)),
         "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT))),
         "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin)),
-        "mountain": (screens.mountain, lf.mountain_view(run, *data[MOUNTAIN], lf.point_info(MOUNTAIN))),
+        "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN))),
     }
     for name, (draw, view) in views.items():
         img = screens.render(draw, view)
