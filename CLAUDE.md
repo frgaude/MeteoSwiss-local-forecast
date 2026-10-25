@@ -50,8 +50,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   colour on all screens.
 - E-paper greys kept light for the T5: danger level fills #eee–#777 with a
   black figure (rounded, no frame), sunshine bars #aaaaaa. Avalanche block
-  rows match the other blocks: label 462, big figures on the 412 baseline
-  (pictograms centred on them), small text 380.
+  rows match the other blocks: label 468, big figures (40 pt, "2=" too) on the
+  412 baseline (pictograms, incl. the altitude under the mountain, centred on
+  them), small text 380. Blocks start at x 8 / 280 / 548.
 - Display: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8: 16 MB flash,
   8 MB PSRAM; ED047TC1 panel 960×540, 16 greys; driver LilyGo-EPD47,
   branch esp32s3). Panel is ~104×58 mm (~234 dpi), so screen text is never

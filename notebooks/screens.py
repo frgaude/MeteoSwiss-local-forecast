@@ -291,18 +291,23 @@ PROBLEM_NAMES = {"new_snow": "new snow", "wind_slab": "wind slab", "persistent_w
                  "favourable_situation": "favourable", "no_distinct_avalanche_problem": "no clear problem"}
 
 
-def _danger_badge(fig, x, baseline, level, text):
+def _danger_badge(fig, x, baseline, level, text, size=40):
     """Danger level figure ("2=") on a rounded fill in the level's colour, no
-    frame; its baseline matches the big figures of the other blocks."""
-    w, h, below = 62, 56, 9                   # px; the fill reaches `below` under the baseline
+    frame, at the size and on the baseline of the other blocks' big figures.
+    Returns the badge's right edge (px)."""
+    probe = fig.text(0, 0, text, fontsize=size, weight="bold")
+    w = probe.get_window_extent(renderer=fig.canvas.get_renderer()).width + 10
+    probe.remove()
+    h, below = 66, 10                         # px; the fill reaches `below` under the baseline
     ax = _axes(fig, x, baseline - below, w, h)
     ax.set_xlim(0, w)
     ax.set_ylim(0, h)
     ax.axis("off")
-    ax.add_patch(FancyBboxPatch((0, 0), w, h, boxstyle="round,pad=0,rounding_size=9",
+    ax.add_patch(FancyBboxPatch((0, 0), w, h, boxstyle="round,pad=0,rounding_size=10",
                                 fc=P["DANGER"][level], ec="none"))
-    ax.text(w / 2, below, text, ha="center", va="baseline", fontsize=30, weight="bold",
+    ax.text(w / 2, below, text, ha="center", va="baseline", fontsize=size, weight="bold",
             color="white" if level >= P["DANGER_WHITE_FROM"] else P["INK"])
+    return x + w
 
 
 def _aspect_rose(fig, x, y, size, aspects):
@@ -414,37 +419,39 @@ def _snow_avalanche_panel(fig, view):
 
     # measured, not forecast: SLF new snow over 24 h / 3 days, and snow depth
     st = view.get("station")
-    _label(fig, 300, 462, "snow 24 h / 3 days (SLF)")
+    _label(fig, 280, 468, "snow 24 h / 3 days (SLF)")
     if st:
-        _value_unit(fig, 300, 412, f"{st['new_24h_cm']:.0f} / {st['new_3d_cm']:.0f}", "cm", 40)
-        _text(fig, 300, 380, f"depth {st['depth_cm']:.0f} cm · {st['name']} {st['alt']:.0f} m", 12,
+        _value_unit(fig, 280, 412, f"{st['new_24h_cm']:.0f} / {st['new_3d_cm']:.0f}", "cm", 40)
+        _text(fig, 280, 380, f"depth {st['depth_cm']:.0f} cm · {st['name']} {st['alt']:.0f} m", 12,
               P["MUTED"])
     else:
-        _text(fig, 300, 412, "no data", 15)
+        _text(fig, 280, 412, "no data", 15)
 
     # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
     # exposure star and altitude mountain of the main avalanche problem
-    # Rows as in the first two blocks: label at 462, big figures on the 412
+    # Rows as in the first two blocks: label at 468, big figures on the 412
     # baseline (pictograms centred on them), small text at 380.
     av = view.get("avalanche")
-    _label(fig, 590, 462, "avalanche danger")
+    _label(fig, 548, 468, "avalanche danger")
     if av:
-        _danger_badge(fig, 590, 412, av["level"], f"{av['level']}{av['sub']}")
-        _text(fig, 660, 433, DANGER_NAMES[av["level"]], 13, weight="bold")
+        right = _danger_badge(fig, 548, 412, av["level"], f"{av['level']}{av['sub']}")
+        _text(fig, right + 8, 433, DANGER_NAMES[av["level"]], 13, weight="bold")
         main = max(av["problems"], key=lambda p: p["level"] or 0) if av["problems"] else None
         if main:
-            _text(fig, 660, 412, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
-            _aspect_rose(fig, 800, 393, 76, main["aspects"])
-            # the mountain and its altitude form one pictogram, centred on the big figures
-            _altitude_mountain(fig, 888, 414, 54, 42, main["above_m"], main["below_m"])
+            _text(fig, right + 8, 412, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")),
+                  13)
+            # pictograms centred on the big figures; the mountain and its
+            # altitude form one pictogram
+            _aspect_rose(fig, 800, 399, 64, main["aspects"])
+            _altitude_mountain(fig, 872, 414, 54, 42, main["above_m"], main["below_m"])
             if main["above_m"] or main["below_m"]:
-                _text(fig, 915, 400, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                _text(fig, 899, 400, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
                       ha="center")
         until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
-        _text(fig, 590, 380, f"until {until:%a %H:%M}", 12, P["MUTED"])
+        _text(fig, 548, 380, f"until {until:%a %H:%M}", 12, P["MUTED"])
     else:
-        _text(fig, 590, 412, "no bulletin", 15)
-        _text(fig, 590, 380, "none published now", 12, P["MUTED"])
+        _text(fig, 548, 412, "no bulletin", 15)
+        _text(fig, 548, 380, "none published now", 12, P["MUTED"])
 
 
 def chalet(view):
