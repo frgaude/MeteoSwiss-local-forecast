@@ -1,0 +1,2 @@
+date,estimate_kwh,actual_kwh,ratio_actual_estimate,run,note
+2026-10-25,3.0,5.89,1.96,202610252100,"heavy overcast and rain; sunny spell ~14:30-16:30 (inverter peak ~5.1 kW, model hourly peak 0.47 kW)"

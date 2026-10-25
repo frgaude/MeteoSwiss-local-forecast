@@ -42,6 +42,10 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   azimuth 212° (180 = south). Home shows today's estimate, tomorrow's from
   1 h after sunset (`lf._solar_day`); the hourly mini chart has one fixed kW
   scale, 0 to round(kWp) = 8 kW, ticks every 2 kW (no % axis, user's choice).
+- PV check (started 25 Oct 2026): `pv_check.csv` logs per day the estimate
+  (`lf.pv_day_estimate`, last run issued that day, user's PV params) against
+  the user's inverter total. User wants several days before any conclusion or
+  tuning (derate, model).
 - Charts (all screens): 39 h from the last local 00:00 / 12:00 (so the past
   hours show too), a tick every 3 h (weekday at midnight), gridlines at
   00:00 / 12:00, a vertical line at render time (`lf._chart_window`,

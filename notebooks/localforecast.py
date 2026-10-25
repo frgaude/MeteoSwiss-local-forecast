@@ -48,28 +48,32 @@ DAILY = {"jp2000d0", "tre200pn", "tre200px", "rka150p0", "rreq10p0", "rreq90p0"}
 # Fetching
 # ---------------------------------------------------------------------------
 
-def latest_run():
-    """Return (run, {param: csv url}) for the newest run published.
+def _day_runs(day):
+    """{run: {param: csv url}} for the complete runs in the item of `day`
+    (items hold the runs of that UTC date; each run's hourly data starts at
+    local midnight of that date). A run's files arrive over a few minutes, so
+    only runs with as many files as the fullest one count."""
+    r = requests.get(f"{STAC}/collections/{COLLECTION}/items/{day:%Y%m%d}-ch", timeout=30)
+    if r.status_code == 404:
+        return {}
+    r.raise_for_status()
+    runs = {}
+    # asset keys look like vnut12.lssw.<YYYYMMDDHHMM>.<param>.csv
+    for k, a in r.json()["assets"].items():
+        runs.setdefault(k.split(".")[2], {})[k.split(".")[3]] = a["href"]
+    full = max((len(u) for u in runs.values()), default=0)
+    return {k: u for k, u in runs.items() if len(u) == full}
 
-    Items are named by production date (local), so look at today's item and
-    fall back to yesterday's: just after midnight today's item exists but
-    is still empty. A run's files arrive over a few minutes, so only runs
-    with as many files as the fullest run of the item count."""
+
+def latest_run():
+    """Return (run, {param: csv url}) for the newest run published: today's
+    item, or yesterday's just after midnight, when today's is still empty."""
     today = datetime.now(TZ).date()
     for day in (today, today - timedelta(days=1)):
-        r = requests.get(f"{STAC}/collections/{COLLECTION}/items/{day:%Y%m%d}-ch", timeout=30)
-        if r.status_code == 404:
-            continue
-        r.raise_for_status()
-        runs = {}
-        # asset keys look like vnut12.lssw.<YYYYMMDDHHMM>.<param>.csv
-        for k, a in r.json()["assets"].items():
-            runs.setdefault(k.split(".")[2], {})[k.split(".")[3]] = a["href"]
-        if not runs:
-            continue
-        full = max(len(u) for u in runs.values())
-        run = max(k for k, u in runs.items() if len(u) == full)
-        return run, runs[run]
+        runs = _day_runs(day)
+        if runs:
+            run = max(runs)
+            return run, runs[run]
     raise RuntimeError("no local-forecast run for today or yesterday")
 
 
@@ -150,8 +154,8 @@ def fetch(keys, params, run=None):
                 os.remove(path)
     todo = [p for p in params if not os.path.exists(os.path.join(run_dir, f"{p}.csv"))]
     if todo:
-        if run != latest:
-            urls = {p: u.replace(latest, run) for p, u in urls.items()}
+        if run != latest:                      # an older run, possibly from another day's item
+            urls = _day_runs(datetime.strptime(run[:8], "%Y%m%d").date())[run]
         print(f"Downloading {len(todo)} parameters for run {run} (~33 MB each, filtered)…")
         with ThreadPoolExecutor(6) as pool:
             list(pool.map(lambda p: _download_filtered(urls[p], sorted(cached),
@@ -389,6 +393,19 @@ def chalet_view(run, hourly, daily, point, bulletin=None, station=None, hours=39
         "avalanche": bulletin,
         "station": station,
     }
+
+
+def pv_day_estimate(day, point_key, pv):
+    """Estimated PV energy (kWh) for the past or current `day` (a date), from
+    the last complete run of that (UTC) date, whose hourly data covers the
+    whole local day. Returns (kWh, run)."""
+    run = max(_day_runs(day))
+    _, data = fetch([point_key], ["gre000h0", "ods000h0", "tre200h0"], run=run)
+    hourly = data[tuple(point_key)][0]
+    p = point_info(point_key)
+    kw = pv_power(hourly, p["lat"], p["lon"], **pv)
+    on = (kw.index - pd.Timedelta(hours=1)).date == day   # stamped at the end of the hour
+    return _r(kw[on].sum()), run
 
 
 def wind_chill(temp, kmh):
