@@ -379,11 +379,10 @@ def _wind_row(ax, view, key):
             ax.text(ti, 0.12, f"{v:.0f}", ha="center", va="center", fontsize=12, color=P["INK"])
 
 
-def chalet(view):
-    fig = _screen()
-    _header(fig, view, f" · {view['alt']:.0f} m")
-    now, h = view["now"], view["hourly"]
-
+def _snow_avalanche_panel(fig, view):
+    """Top panel of chalet and mountain: forecast for now with the 0° level,
+    new snow and sunshine over the next 48 h, and the avalanche bulletin."""
+    now = view["now"]
     _icon(fig, now["icon"], 8, 368, 105)
     _text(fig, 118, 412, _deg(now['temp']), 50, weight="bold")
     _text(fig, 121, 380, f"0° level {now['freezing_m']} m", 13, P["MUTED"])
@@ -405,20 +404,28 @@ def chalet(view):
         _text(fig, 623, 408, f"{av['level']}{av['sub']}", 30,
               "white" if av["level"] >= P["DANGER_WHITE_FROM"] else P["INK"], weight="bold",
               ha="center", va="center")
-        _text(fig, 666, 428, DANGER_NAMES[av["level"]], 14, weight="bold")
+        _text(fig, 666, 428, DANGER_NAMES[av["level"]], 13, weight="bold")
         main = max(av["problems"], key=lambda p: p["level"] or 0) if av["problems"] else None
         if main:
             _text(fig, 666, 405, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
-            _aspect_rose(fig, 780, 366, 88, main["aspects"])
-            _altitude_mountain(fig, 870, 398, 76, 52, main["above_m"], main["below_m"])
+            _aspect_rose(fig, 790, 370, 82, main["aspects"])
+            _altitude_mountain(fig, 878, 398, 68, 50, main["above_m"], main["below_m"])
             if main["above_m"] or main["below_m"]:
-                _text(fig, 908, 378, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                _text(fig, 912, 378, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
                       ha="center")
         until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
         _text(fig, 666, 380, f"until {until:%a %H:%M}", 11, P["MUTED"])
     else:
         _text(fig, 590, 412, "no bulletin", 15)
         _text(fig, 590, 388, "none published now", 13, P["MUTED"])
+
+
+def chalet(view):
+    fig = _screen()
+    _header(fig, view, f" · {view['alt']:.0f} m")
+    h = view["hourly"]
+
+    _snow_avalanche_panel(fig, view)
 
     # 48 h: sunshine strip on top, then snowfall bars and temperature line
     t = _times(h)
@@ -441,26 +448,8 @@ def chalet(view):
 def mountain(view):
     fig = _screen()
     _header(fig, view, f" · {view['alt']:.0f} m")
-    now, h = view["now"], view["hourly"]
 
-    # now: icon, temperature and felt temperature
-    _icon(fig, now["icon"], 8, 368, 105)
-    _text(fig, 118, 412, _deg(now["temp"]), 50, weight="bold")
-    _text(fig, 121, 380, f"feels like {_deg(now['feels'])}", 13, P["MUTED"])
-
-    # wind in km/h, as MeteoSwiss gives it for mountains
-    _label(fig, 300, 462, "wind")
-    _text(fig, 300, 412, f"{now['wind_kmh']:.0f}", 42, weight="bold")
-    _text(fig, 308 + 36 * len(f"{now['wind_kmh']:.0f}"), 412, "km/h", 15, P["MUTED"])
-    _text(fig, 300, 380, f"gusts {now['gust_kmh']:.0f} km/h", 13, P["MUTED"])
-    _compass(fig, 480, 362, 110, now["dir"])
-
-    # zero-degree level against the summit
-    _label(fig, 650, 462, "0° level")
-    _text(fig, 650, 415, f"{now['freezing_m']} m", 26, weight="bold")
-    gap = now["freezing_m"] - view["alt"]
-    _text(fig, 650, 385, f"{abs(gap):.0f} m {'above' if gap >= 0 else 'below'} the summit", 13,
-          P["MUTED"])
+    _snow_avalanche_panel(fig, view)
 
     # as in the MeteoSwiss app: wind every 3 h (arrow + km/h), sunshine with
     # sunrise and sunset, then snow, rain and temperature

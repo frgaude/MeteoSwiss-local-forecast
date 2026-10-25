@@ -13,11 +13,12 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
 - Boat: wind in knots: mean with 10–90 % range, gusts, direction (Lake Geneva).
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
-- Mountain (Le Toûno): temperature + wind chill ("feels like"), wind now in
-  km/h (gusts, compass), 0° level against the summit; then, like the
-  MeteoSwiss app: wind row (arrow + mean km/h every 3 h), sunshine min/h with
-  sunrise/sunset (`lf.sun_events`, standard horizon, within ~3 min of
-  MeteoSwiss), and the chalet-style snow/rain/temperature chart. No daily pane.
+- Mountain (Le Toûno): top panel shared with the chalet
+  (`screens._snow_avalanche_panel`: now + 0° level, new snow / sunshine 48 h,
+  SLF bulletin, same region CH-4124); then, like the MeteoSwiss app: wind row
+  (arrow + mean km/h every 3 h), sunshine min/h with sunrise/sunset
+  (`lf.sun_events`, standard horizon, within ~3 min of MeteoSwiss), and the
+  chalet-style snow/rain/temperature chart. No daily pane, no wind-now block.
 
 Describe all data as forecasts (e.g. "forecast for now", not "current").
 
