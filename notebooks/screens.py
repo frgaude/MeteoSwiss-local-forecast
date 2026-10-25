@@ -315,11 +315,15 @@ def boat(view):
     stale = (not m or m["status"] != "green"
              or datetime.now(lf.TZ) - when > timedelta(hours=2))
     if stale:
-        lines(345, "LUTRY PORT", ["no recent measurement"]
-              + ([f"last {when:%a %H}h{when:%M} · {m['status']}"] if m else []))
+        info = []
+        if m:
+            info.append(f"last reading {when:%a %H}h{when:%M}")
+            if m["status"] != "green":
+                info.append(f"station status {m['status']}")
+        lines(345, "LUTRY PORT", ["no recent measurement"] + info)
     else:
         _wind_dial(fig, 345, 352, 140, m["dir"], m["wind_kt"], "kt")
-        rows = [f"gusts {m['gust_kt']:.0f} kt"]
+        rows = [f"gusts {m['gust_kt']:.0f} kt"] if m["gust_kt"] is not None else []
         if m["water_c"] is not None:
             rows.append(f"water {m['water_c']:.1f}°")
         if m["gust_max_12h_kt"] is not None:

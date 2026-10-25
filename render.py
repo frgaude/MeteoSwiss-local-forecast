@@ -34,6 +34,15 @@ PV = {"kwp": 7.905, "tilt": 29, "azimuth": 212, "derate": 0.88}   # azimuth 180 
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _optional(fetch, *args):
+    """`fetch(*args)`, or None (logged) if it fails in any way."""
+    try:
+        return fetch(*args)
+    except Exception as e:
+        print(f"{fetch.__name__}{args}: unavailable ({e!r})")
+        return None
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     # one pass over each parameter CSV for all points
@@ -46,11 +55,13 @@ def main(out):
     except Exception as e:  # the screen still works without it
         print(f"SLF bulletin unavailable: {e}")
         bulletin = None
-    station = lf.slf_station(SLF_STATION)     # measured snow, None if unavailable
+    # measurements: an unreachable or broken source leaves its block empty,
+    # it must never stop the screens from being rendered
+    station = _optional(lf.slf_station, SLF_STATION)
+    measured = _optional(lf.windspots_station, WIND_STATION)
     views = {
         "home": (screens.home, lf.home_view(run, *data[HOME], lf.point_info(HOME), PV)),
-        "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT),
-                                            lf.windspots_station(WIND_STATION))),
+        "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT), measured)),
         "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin, station)),
         "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN), bulletin, station)),
     }

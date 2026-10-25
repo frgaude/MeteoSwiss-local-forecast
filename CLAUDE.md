@@ -18,7 +18,11 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
   3h in whole mm, 3h weather text wrapped on two lines) and, as a second dial, "Lutry port 23h01": measured wind at
   WindSpots station CHVD19 (Lutry - Port du Vieux-Stand,
   api.windspots.org/mobile, km/h → kt) with gusts, water temperature, max
-  gust 12h; "no recent measurement" if older than 2 h or status not green. Replaced the
+  gust 12h; "no recent measurement" if older than 2 h or status not green.
+  WindSpots is often offline: `lf.windspots_station` never raises (None when
+  no speed/direction/time; missing history or water only blank that line), and
+  render.py fetches both measurement sources via `_optional`, so a failure can
+  never stop the screens from rendering (tested 26 Oct 2026 with 12 cases). Replaced the
   forecast "next 12 h" block (26 Oct 2026).
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).

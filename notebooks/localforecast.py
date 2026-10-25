@@ -349,21 +349,41 @@ def home_view(run, hourly, daily, point, pv, hours=39, days=5):
 def windspots_station(code="CHVD19"):
     """Latest measurement at a WindSpots station (CHVD19 = Lutry - Port du
     Vieux-Stand): {name, time, status, wind_kt, gust_kt, dir, dir_name,
-    water_c, gust_max_12h_kt}, or None if the station cannot be read.
-    WindSpots gives speeds in km/h and local times."""
+    water_c, gust_max_12h_kt}, or None when there is no usable measurement
+    (API down, station missing, or no wind speed and direction reported).
+    WindSpots gives speeds in km/h and local times. The station is often
+    offline, so nothing here may raise; a missing 12 h history or water
+    temperature only leaves that value None."""
+    def get(path, **params):
+        try:
+            return requests.get(WINDSPOTS + path, params=params, timeout=30).json()
+        except (requests.RequestException, ValueError):
+            return None
+
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
     try:
-        info = next(s for s in requests.get(WINDSPOTS + "stationinfo.json", timeout=30)
-                    .json()["stationInfo"] if s["stationName"] == code)
-        hist = requests.get(WINDSPOTS + "stationdata.json", params={"station": code, "duration": 12},
-                            timeout=30).json()["stationData"]["windChart"]["serie"]["points"]
-    except (requests.RequestException, ValueError, KeyError, TypeError, StopIteration):
+        info = next(s for s in get("stationinfo.json")["stationInfo"]
+                    if isinstance(s, dict) and s.get("stationName") == code)
+        time = pd.Timestamp(info["dataTime"]).tz_localize(TZ)
+    except (TypeError, KeyError, ValueError, StopIteration):
         return None
-    num = lambda v: float(v) if v not in (None, "") else None
-    gusts = [num(p["gust"]) for p in hist if num(p.get("gust")) is not None]
-    return {"name": info["displayName"], "status": info["status"],
-            "time": pd.Timestamp(info["dataTime"]).tz_localize(TZ).isoformat(timespec="minutes"),
-            "wind_kt": _r(num(info["speed"]) * KMH_TO_KT), "gust_kt": _r(num(info["gust"]) * KMH_TO_KT),
-            "dir": int(info["direction"]), "dir_name": info["directionAlpha"],
+    speed, gust, direction = num(info.get("speed")), num(info.get("gust")), num(info.get("direction"))
+    if speed is None or direction is None or pd.isna(time):
+        return None
+    try:
+        points = get("stationdata.json", station=code, duration=12)["stationData"]["windChart"]["serie"]["points"]
+        gusts = [g for g in (num(p.get("gust")) for p in points if isinstance(p, dict)) if g is not None]
+    except (TypeError, KeyError):
+        gusts = []
+    return {"name": info.get("displayName", code), "status": info.get("status", "unknown"),
+            "time": time.isoformat(timespec="minutes"),
+            "wind_kt": _r(speed * KMH_TO_KT), "gust_kt": _r(gust * KMH_TO_KT) if gust is not None else None,
+            "dir": int(direction) % 360, "dir_name": info.get("directionAlpha", ""),
             "water_c": num(info.get("water")),
             "gust_max_12h_kt": _r(max(gusts) * KMH_TO_KT) if gusts else None}
 
