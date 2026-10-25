@@ -399,7 +399,7 @@ def _snow_avalanche_panel(fig, view):
 
     # measured, not forecast: SLF new snow over 24 h / 3 days, and snow depth
     st = view.get("station")
-    _label(fig, 300, 462, "new snow 24 h / 3 days (SLF)")
+    _label(fig, 300, 462, "snow 24 h / 3 days (SLF)")
     if st:
         _value_unit(fig, 300, 412, f"{st['new_24h_cm']:.0f} / {st['new_3d_cm']:.0f}", "cm", 40)
         _text(fig, 300, 380, f"depth {st['depth_cm']:.0f} cm · {st['name']} {st['alt']:.0f} m", 12,
