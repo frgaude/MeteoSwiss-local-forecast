@@ -382,7 +382,7 @@ def _wind_row(ax, view, key):
 
 def _snow_avalanche_panel(fig, view):
     """Top panel of chalet and mountain: forecast for now with the 0° level,
-    new snow and sunshine over the next 48 h, and the avalanche bulletin."""
+    measured snow at the SLF station, and the avalanche bulletin."""
     now = view["now"]
     if "feels" in now:                        # mountain: wind chill above the temperature
         _text(fig, 121, 470, f"feels like {_deg(now['feels'])}", 13, P["MUTED"])
@@ -390,11 +390,19 @@ def _snow_avalanche_panel(fig, view):
     _text(fig, 118, 412, _deg(now['temp']), 50, weight="bold")
     _text(fig, 121, 380, f"0° level {now['freezing_m']} m", 13, P["MUTED"])
 
-    _label(fig, 330, 462, "new snow 48 h (est.)")
-    snow = f"{view['snow_next_cm']:.0f}"
-    _text(fig, 330, 412, snow, 42, weight="bold")
-    _text(fig, 336 + 32 * len(snow), 412, "cm", 15, P["MUTED"])
-    _text(fig, 330, 380, f"sunshine 48 h: {view['sun_next_h']:.0f} h", 13, P["MUTED"])
+    # measured, not forecast: snow depth and new snow over 24 h at the station
+    st = view.get("station")
+    if st:
+        _label(fig, 330, 462, f"{st['name']} {st['alt']:.0f} m · SLF")
+        depth = f"{st['depth_cm']:.0f}"
+        _text(fig, 330, 412, depth, 42, weight="bold")
+        _text(fig, 338 + 36 * len(depth), 412, "cm", 15, P["MUTED"])
+        new = (f"+{st['new_24h_cm']:.0f} cm new in 24 h" if st["new_24h_cm"] >= 0.5
+               else "no new snow in 24 h")
+        _text(fig, 330, 380, f"{new} · {datetime.fromisoformat(st['time']):%H:%M}", 13, P["MUTED"])
+    else:
+        _label(fig, 330, 462, "snow measured (SLF)")
+        _text(fig, 330, 412, "no data", 15)
 
     # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
     # exposure star and altitude mountain of the main avalanche problem

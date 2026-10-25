@@ -28,6 +28,7 @@ BOAT = (109500, 2)        # Lutry, lake shore
 CHALET = (396123, 2)      # Chandolin, 1900 m
 MOUNTAIN = (1119, 3)      # Le Toûno, 3018 m (point of interest)
 SLF_REGION = "CH-4124"    # Val d'Anniviers
+SLF_STATION = "ANV2"      # Orzival, 2640 m: measured snow depth
 PV = {"kwp": 10, "tilt": 30, "azimuth": 180}
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -43,11 +44,12 @@ def main(out):
     except Exception as e:  # the screen still works without it
         print(f"SLF bulletin unavailable: {e}")
         bulletin = None
+    station = lf.slf_station(SLF_STATION)     # measured snow, None if unavailable
     views = {
         "home": (screens.home, lf.home_view(run, *data[HOME], lf.point_info(HOME), PV)),
         "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT))),
-        "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin)),
-        "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN), bulletin)),
+        "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin, station)),
+        "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN), bulletin, station)),
     }
     for name, (draw, view) in views.items():
         img = screens.render(draw, view)

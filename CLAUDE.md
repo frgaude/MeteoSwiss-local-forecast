@@ -14,8 +14,10 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
 - Mountain (Le Toûno): top panel shared with the chalet
-  (`screens._snow_avalanche_panel`: now + 0° level, new snow / sunshine 48 h,
-  SLF bulletin, same region CH-4124), plus "feels like" (wind chill,
+  (`screens._snow_avalanche_panel`: now + 0° level, measured snow at SLF IMIS
+  station ANV2 Orzival 2640 m (`lf.slf_station`: depth + new snow 24 h as the
+  sum of smoothed depth rises; replaced the 48 h forecast new snow and
+  sunshine on 25 Oct 2026), SLF bulletin, same region CH-4124), plus "feels like" (wind chill,
   `lf.wind_chill`) above the temperature; then, like the MeteoSwiss app: wind row
   (arrow + mean km/h every 3 h), sunshine min/h with sunrise/sunset
   (`lf.sun_events`, standard horizon, within ~3 min of MeteoSwiss), and the

@@ -24,6 +24,7 @@ STAC = "https://data.geo.admin.ch/api/stac/v1"
 COLLECTION = "ch.meteoschweiz.ogd-local-forecasting"
 POINTS_URL = f"https://data.geo.admin.ch/{COLLECTION}/ogd-local-forecasting_meta_point.csv"
 SLF_URL = "https://aws.slf.ch/api/bulletin/caaml/{lang}/json"
+SLF_IMIS = "https://measurement-api.slf.ch/public/api/imis/"
 ICONS_URL = ("https://raw.githubusercontent.com/MeteoSwiss/opendata-localforecast-demos/"
              "main/notebooks/icons/")
 
@@ -352,21 +353,18 @@ def boat_view(run, hourly, point, hours=39):
     }
 
 
-def chalet_view(run, hourly, daily, point, bulletin=None, hours=39, days=5):
-    """Now, new snow and sunshine over the next 48 h, `hours` of snow, rain,
-    sunshine and temperature from the last 00:00 / 12:00, daily snow/sun/
-    min/max for `days`, plus the avalanche bulletin summary if given."""
+def chalet_view(run, hourly, daily, point, bulletin=None, station=None, hours=39, days=5):
+    """Now, `hours` of snow, rain, sunshine and temperature from the last
+    00:00 / 12:00, daily snow/sun/min/max for `days`, plus the avalanche
+    bulletin and measured snow at an SLF station (`slf_station`) if given."""
     snow = snow_fraction(hourly, point["alt"])
     snow_cm = hourly["rre150h0"] * snow          # ~1 cm fresh snow per mm water
     nxt, chart = _chart_window(hourly, hours)
-    next48 = _upcoming(hourly, 48)
     now = _now_row(hourly)
     return {
         "view": "chalet", "name": point["name"], "alt": point["alt"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
                 "freezing_m": int(now["zprfr0hs"])},
-        "snow_next_cm": _r(snow_cm[next48.index].sum()),
-        "sun_next_h": _r(next48["sre000h0"].sum() / 60),
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
@@ -378,6 +376,7 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=39, days=5):
         "chart": chart,
         "days": _days(hourly, daily, days, snow_cm),
         "avalanche": bulletin,
+        "station": station,
     }
 
 
@@ -401,16 +400,15 @@ def sun_events(lat, lon, start, end):
             for i in np.flatnonzero(np.diff(up.astype(int)))]
 
 
-def mountain_view(run, hourly, point, bulletin=None, hours=39):
+def mountain_view(run, hourly, point, bulletin=None, station=None, hours=39):
     """Summit forecast: now with the felt temperature (wind chill) and the 0°
-    level, new snow and sunshine over the next 48 h and the avalanche
-    bulletin (as on the chalet screen), then
+    level, measured snow at an SLF station and the avalanche bulletin (as on
+    the chalet screen), then
     `hours` from the last 00:00 / 12:00 of wind, sunshine with sunrise and
     sunset, snow, rain and temperature."""
     snow = snow_fraction(hourly, point["alt"])
     snow_cm = hourly["rre150h0"] * snow
     nxt, chart = _chart_window(hourly, hours)
-    next48 = _upcoming(hourly, 48)
     now = _now_row(hourly)
     return {
         "view": "mountain", "name": point["name"], "alt": point["alt"],
@@ -418,8 +416,6 @@ def mountain_view(run, hourly, point, bulletin=None, hours=39):
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
                 "feels": _r(float(wind_chill(now["tre200h0"], now["fu3010h0"]))),
                 "freezing_m": int(now["zprfr0hs"])},
-        "snow_next_cm": _r(snow_cm[next48.index].sum()),
-        "sun_next_h": _r(next48["sre000h0"].sum() / 60),
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
@@ -433,6 +429,7 @@ def mountain_view(run, hourly, point, bulletin=None, hours=39):
         "chart": chart,
         "sun_events": sun_events(point["lat"], point["lon"], chart["start"], chart["end"]),
         "avalanche": bulletin,
+        "station": station,
     }
 
 
@@ -471,6 +468,29 @@ def slf_bulletin(region_id, lang="en", active_at=None):
             "problems": problems,
         }
     return None
+
+
+def slf_station(code="ANV2"):
+    """Measured snow at an SLF IMIS station (ANV2 = Orzival, 2640 m, Val
+    d'Anniviers): {name, alt, time, depth_cm, new_24h_cm}, or None if the
+    station or its snow sensor gives nothing.
+
+    The API returns the last 24 h of half-hourly snow depth (HS). New snow is
+    the sum of the rises in depth (hourly means, smoothed over 3 h), so snow
+    that fell and then settled or melted still counts; it is an estimate."""
+    try:
+        meta = next(s for s in requests.get(SLF_IMIS + "stations", timeout=30).json()
+                    if s["code"] == code)
+        rows = requests.get(f"{SLF_IMIS}station/{code}/measurements", timeout=30).json()
+    except (requests.RequestException, ValueError, StopIteration):
+        return None
+    hs = pd.Series({pd.Timestamp(m["measure_date"]): m["HS"] for m in rows}, dtype=float).dropna()
+    if hs.empty:
+        return None
+    smooth = hs.resample("1h").mean().rolling(3, min_periods=1, center=True).mean()
+    return {"name": meta["label"], "alt": meta["elevation"],
+            "time": hs.index[-1].tz_convert(TZ).isoformat(timespec="minutes"),
+            "depth_cm": _r(hs.iloc[-1]), "new_24h_cm": _r(smooth.diff().clip(lower=0).sum())}
 
 
 def slf_regions(lang="en", active_at="2026-02-15T10:00:00Z"):
