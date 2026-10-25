@@ -296,32 +296,38 @@ def boat(view):
     _header(fig, view)
     now, h = view["now"], view["hourly"]
 
-    # now: wind dial (direction and mean speed), gusts and Beaufort beside it
+    # forecast for now: wind dial (direction and mean speed), gusts and
+    # Beaufort beside it
     _wind_dial(fig, 10, 352, 140, now["dir"], now["wind_kt"], "kt")
-    _label(fig, 170, 468, "gusts")
+    _label(fig, 170, 468, "forecast gusts")
     _value_unit(fig, 170, 412, f"{now['gust_kt']:.0f}", "kt", 40)
     _text(fig, 170, 380, f"Beaufort {_beaufort(now['wind_kt'])}", 13, P["MUTED"])
 
-    # measured at the port (WindSpots), not forecast: mean / gust, direction,
-    # water temperature and the strongest gust of the last 12 h
+    # measured at the port (WindSpots), the same way: dial, gusts beside it,
+    # with the water temperature and the strongest gust of the last 12 h
     t = _times(h)
     m = view.get("measured")
     when = datetime.fromisoformat(m["time"]) if m else None
     stale = (not m or m["status"] != "green"
              or datetime.now(lf.TZ) - when > timedelta(hours=2))
-    _label(fig, 370, 468, f"measured · Lutry port (WindSpots){f' · {when:%H:%M}' if m else ''}")
     if stale:
-        _text(fig, 370, 412, "no recent measurement", 15)
+        _label(fig, 330, 468, "measured · Lutry port (WindSpots)")
+        _text(fig, 330, 412, "no recent measurement", 15)
         if m:
-            _text(fig, 370, 380, f"last {when:%a %H:%M} · station {m['status']}", 13, P["MUTED"])
+            _text(fig, 330, 380, f"last {when:%a %H:%M} · station {m['status']}", 13, P["MUTED"])
     else:
-        _value_unit(fig, 370, 412, f"{m['wind_kt']:.0f} / {m['gust_kt']:.0f}", "kt", 40)
-        small = ["mean / gust", m["dir_name"]]
+        _wind_dial(fig, 320, 352, 140, m["dir"], m["wind_kt"], "kt")
+        _label(fig, 480, 468, f"measured gusts · Lutry port {when:%H:%M}")
+        _value_unit(fig, 480, 412, f"{m['gust_kt']:.0f}", "kt", 40)
+        # the other stats in a column right of the gust figure
+        stats = []
         if m["water_c"] is not None:
-            small.append(f"water {m['water_c']:.1f}°")
+            stats.append(f"water {m['water_c']:.1f}°")
         if m["gust_max_12h_kt"] is not None:
-            small.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt")
-        _text(fig, 370, 380, " · ".join(small), 13, P["MUTED"])
+            stats.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt")
+        stats.append("WindSpots")
+        for i, line in enumerate(stats):
+            _text(fig, 600, 430 - 25 * i, line, 13, P["MUTED"])
     _icon(fig, now["icon"], W - 115, 365, 100)
     _text(fig, W - 120, 425, _deg(now['temp']), 26, weight="bold", ha="right")
 
