@@ -70,6 +70,10 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   (GPIO0/12/13) are also held through deep sleep. Serial prints ms stamps,
   the reset reason, and the previous boot's last step (kept in RTC memory).
   Schematic: LilyGo-EPD47 repo, schematic/T5-ePaper-S3-V2.3.pdf.
+- Screen clear: the driver's epd_clear() flashes black/white 4 times
+  (~1.2 s). Hourly / power-on / reset redraws keep 4; button wakes and
+  switches use `LIGHT_CLEAR_CYCLES` (platformio.ini build flag) = 1: no
+  ghosting seen on the panel (25 Oct 2026), ~0.9 s faster.
   Pages is public (and needs a public repo on a free plan).
 - Repo: https://github.com/frgaude/MeteoSwiss-local-forecast (public), Pages
   https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub

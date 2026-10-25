@@ -35,6 +35,12 @@ const int N_VIEWS = sizeof(VIEWS) / sizeof(VIEWS[0]);
 const int FETCH_MINUTE = 40;  // render job runs at :12 and :32, GitHub may delay it
 const int RETRY_S = 10 * 60;
 const uint32_t AWAKE_MS = 20000;  // stay awake after the last button press
+// Black/white clear cycles before drawing: full on the hourly update (nobody
+// watching, removes any ghosting), light when switching screens by button.
+const int FULL_CLEAR_CYCLES = 4;
+#ifndef LIGHT_CLEAR_CYCLES
+#define LIGHT_CLEAR_CYCLES 1  // set in platformio.ini
+#endif
 const size_t FB_SIZE = EPD_WIDTH * EPD_HEIGHT / 2;  // 960×540, 4 bits per pixel
 
 static uint8_t *fb;
@@ -118,11 +124,15 @@ static void stamp(const char *what) {
   Serial.printf("%6lu ms  %s\n", millis(), what);
 }
 
-static void draw() {
+// Full refresh every time (no partial updates, which LilyGO warns leave
+// ghosting): clear by flashing black/white `clear_cycles` times, then draw.
+// The driver's epd_clear() does 4 cycles (~1.2 s); fewer flash less but may
+// leave faint traces of the previous screen.
+static void draw(int clear_cycles) {
   epd_poweron();
   stamp("panel powered on");
-  epd_clear();  // full refresh every time: no ghosting from partial updates
-  stamp("cleared");
+  epd_clear_area_cycles(epd_full_screen(), clear_cycles, 50);
+  stamp(clear_cycles == FULL_CLEAR_CYCLES ? "cleared (full)" : "cleared (light)");
   epd_draw_grayscale_image(epd_full_screen(), fb);
   epd_poweroff();
   stamp("drawn");
@@ -163,7 +173,7 @@ static int switch_screens(int view) {
     if (n) {
       view = (view + n) % N_VIEWS;
       Serial.printf("button: %s\n", VIEWS[view]);
-      if (load(VIEWS[view])) draw();
+      if (load(VIEWS[view])) draw(LIGHT_CLEAR_CYCLES);
       last = millis();
     }
   }
@@ -309,7 +319,7 @@ void setup() {
   }
   if (load(VIEWS[view])) {
     stamp("screen loaded");
-    draw();
+    draw(button ? LIGHT_CLEAR_CYCLES : FULL_CLEAR_CYCLES);
   }
   // someone is at the board (button, power on, reset): give them time to
   // switch screens; the hourly timer goes straight back to sleep
