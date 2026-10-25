@@ -39,8 +39,7 @@ BOAT_PARAMS = ["fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
 CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0",
                  "zprfr0hs", "sre000h0", "jp2000d0", "tre200pn", "tre200px"]
 MOUNTAIN_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "zprfr0hs", "sre000h0",
-                   "fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
-                   "jp2000d0", "tre200pn", "tre200px"]
+                   "fu3010h0", "fu3010h1", "dkl010h0", "jp2000d0", "tre200pn", "tre200px"]
 DAILY = {"jp2000d0", "tre200pn", "tre200px", "rka150p0", "rreq10p0", "rreq90p0"}
 
 
@@ -393,9 +392,10 @@ def wind_chill(temp, kmh):
 
 def mountain_view(run, hourly, daily, point, hours=39, days=5):
     """Summit forecast: now (temperature, felt temperature, wind in km/h,
-    0° level), `hours` of wind with its 10–90 % range, gusts, direction and
-    temperature from the last 00:00 / 12:00, and a daily outlook with new snow."""
-    snow_cm = hourly["rre150h0"] * snow_fraction(hourly, point["alt"])
+    0° level), `hours` of snow, rain, temperature and wind from the last
+    00:00 / 12:00, and a daily outlook with new snow."""
+    snow = snow_fraction(hourly, point["alt"])
+    snow_cm = hourly["rre150h0"] * snow
     nxt, chart = _chart_window(hourly, hours)
     next48 = _upcoming(hourly, 48)
     now = _now_row(hourly)
@@ -410,10 +410,9 @@ def mountain_view(run, hourly, daily, point, hours=39, days=5):
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
+            "snow_cm": [_r(v) for v in snow_cm[nxt.index]],
+            "rain_mm": [_r(v) for v in nxt["rre150h0"] * (1 - snow[nxt.index])],
             "wind_kmh": [_r(v) for v in nxt["fu3010h0"]],
-            "wind_q10_kmh": [_r(v) for v in nxt["fu3q10h0"]],
-            "wind_q90_kmh": [_r(v) for v in nxt["fu3q90h0"]],
-            "gust_kmh": [_r(v) for v in nxt["fu3010h1"]],
             "dir": [int(v) for v in nxt["dkl010h0"]],
             "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
         },

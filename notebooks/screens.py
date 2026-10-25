@@ -114,10 +114,10 @@ def _precip_scale(ax, totals):
     ax.set_yticks(range(0, top + 1, top // 4))
 
 
-def _temp_axis(ax, t, temp, lo=None, ls="-"):
+def _temp_axis(ax, t, temp, lo=None):
     """Temperature line on a right-hand axis, with a white halo over bars."""
     ax2 = ax.twinx()
-    ax2.plot(t, temp, color=P["TEMP"], lw=3, ls=ls, label="temperature",
+    ax2.plot(t, temp, color=P["TEMP"], lw=3,
              path_effects=[pe.Stroke(linewidth=7, foreground="white"), pe.Normal()])
     ax2.set_ylim((min(temp) if lo is None else min(min(temp), lo)) - 2, max(temp) + 2)
     ax2.yaxis.set_major_locator(plt.MaxNLocator(4, integer=True))
@@ -326,6 +326,38 @@ def _altitude_mountain(fig, x, y, w, h, above, below):
         ax.plot([0.16, 0.84], [level, level], color=P["INK"], lw=1.2)
 
 
+def _snow_rain_temp(ax, view):
+    """Snow and rain bars (0–8 per hour or more) under the temperature line."""
+    h = view["hourly"]
+    t = _times(h)
+    tb = _hour_starts(t)
+    _shade_nights(ax, t)
+    ax.bar(tb, h["snow_cm"], width=0.9 / 24, align="edge", color=P["SNOW"],
+           label="snow cm" if any(h["snow_cm"]) else None)
+    ax.bar(tb, h["rain_mm"], bottom=h["snow_cm"], width=0.9 / 24, align="edge", color=P["RAIN"],
+           label="rain mm")
+    _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
+    ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
+    _time_axis(ax, view["chart"])
+    ax2 = _temp_axis(ax, t, h["temp"], lo=0)
+    ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
+
+
+def _wind_row(ax, view, key):
+    """Wind every 3 h on the chart's time scale: an arrow blowing with the
+    wind, and the mean speed under it."""
+    h, chart = view["hourly"], view["chart"]
+    ax.set_xlim(datetime.fromisoformat(chart["start"]), datetime.fromisoformat(chart["end"]))
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    for ti, d, v in zip(_times(h), h["dir"], h[key]):
+        if ti.hour % 3 == 0 and v is not None:
+            ax.text(ti, 0.72, "↓", rotation=-d, ha="center", va="center", fontsize=16, weight="bold",
+                    color=P["INK"])
+            ax.text(ti, 0.12, f"{v:.0f}", ha="center", va="center", fontsize=12, weight="bold",
+                    color=P["INK"])
+
+
 def chalet(view):
     fig = _screen()
     _header(fig, view, f" · {view['alt']:.0f} m")
@@ -365,7 +397,7 @@ def chalet(view):
         _text(fig, 666, 380, f"until {until:%a %H:%M}", 11, P["MUTED"])
     else:
         _text(fig, 590, 412, "no bulletin", 15)
-        _text(fig, 590, 388, "outside the season", 13, P["MUTED"])
+        _text(fig, 590, 388, "none published now", 13, P["MUTED"])
 
     # 48 h: sunshine strip on top, then snowfall bars and temperature line
     t = _times(h)
@@ -376,17 +408,7 @@ def chalet(view):
     sx.set_xlim(datetime.fromisoformat(view["chart"]["start"]), datetime.fromisoformat(view["chart"]["end"]))
     sx.axis("off")
     _text(fig, 18, 324, "sun", 11, P["MUTED"], weight="bold")
-    ax = _axes(fig, 62, 165, 830, 145)
-    _shade_nights(ax, t)
-    ax.bar(tb, h["snow_cm"], width=0.9 / 24, align="edge", color=P["SNOW"],
-           label="snow cm" if any(h["snow_cm"]) else None)
-    ax.bar(tb, h["rain_mm"], bottom=h["snow_cm"], width=0.9 / 24, align="edge", color=P["RAIN"],
-           label="rain mm")
-    _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
-    ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
-    _time_axis(ax, view["chart"])
-    ax2 = _temp_axis(ax, t, h["temp"], lo=0)
-    ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
+    _snow_rain_temp(_axes(fig, 62, 165, 830, 145), view)
 
     # daily outlook
     _daily(fig, view["days"], "snow")
@@ -419,17 +441,11 @@ def mountain(view):
     _text(fig, 650, 385, f"{abs(gap):.0f} m {'above' if gap >= 0 else 'below'} the summit", 13,
           P["MUTED"])
 
-    # 48 h: wind with range, gusts and direction; temperature (dashed) on the right
-    t = _times(h)
-    ax = _axes(fig, 62, 165, 830, 180)
-    # headroom above the data for the legend and the direction arrows
-    top = max(max(h["gust_kmh"]), max(h["wind_q90_kmh"]), 30) * 1.5
-    _wind_chart(ax, view["chart"], t, h["wind_kmh"], h["wind_q10_kmh"], h["wind_q90_kmh"], h["gust_kmh"], h["dir"],
-                "km/h", top=top, step=20 if top > 60 else 10, arrows_at=0.76)
-    ax2 = _temp_axis(ax, t, h["temp"], ls="--")
-    ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
-    handles = ax.get_legend_handles_labels()[0] + ax2.get_legend_handles_labels()[0]
-    ax.legend(handles=handles, loc="upper left", fontsize=11, frameon=False, ncol=4, handlelength=1.5)
+    # chart like the chalet's, with the wind every 3 h above it (arrow + km/h),
+    # as in the MeteoSwiss app
+    _wind_row(_axes(fig, 62, 303, 830, 44), view, "wind_kmh")
+    _text(fig, 18, 312, "km/h", 11, P["MUTED"], weight="bold")
+    _snow_rain_temp(_axes(fig, 62, 165, 830, 132), view)
 
     # daily outlook
     _daily(fig, view["days"], "snow")
