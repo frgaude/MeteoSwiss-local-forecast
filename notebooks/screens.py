@@ -63,7 +63,14 @@ def _icon(fig, code, x, y, w):
 
 
 def _text(fig, x, y, s, size=12, color=None, weight="normal", ha="left", va="baseline"):
-    fig.text(x / W, y / H, s, fontsize=size, color=color or P["INK"], weight=weight, ha=ha, va=va)
+    return fig.text(x / W, y / H, s, fontsize=size, color=color or P["INK"], weight=weight, ha=ha,
+                    va=va)
+
+
+def _right_edge(fig, *texts):
+    """Right edge (px) of the widest of the drawn `texts`."""
+    renderer = fig.canvas.get_renderer()
+    return max(t.get_window_extent(renderer=renderer).x1 for t in texts)
 
 
 def _deg(v):
@@ -435,17 +442,20 @@ def _snow_avalanche_panel(fig, view):
     _label(fig, 548, 468, "avalanche danger")
     if av:
         right = _danger_badge(fig, 548, 412, av["level"], f"{av['level']}{av['sub']}")
-        _text(fig, right + 8, 433, DANGER_NAMES[av["level"]], 13, weight="bold")
+        texts = [_text(fig, right + 8, 433, DANGER_NAMES[av["level"]], 13, weight="bold")]
         main = max(av["problems"], key=lambda p: p["level"] or 0) if av["problems"] else None
         if main:
-            _text(fig, right + 8, 412, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")),
-                  13)
-            # pictograms centred on the big figures; the mountain and its
-            # altitude form one pictogram
-            _aspect_rose(fig, 800, 399, 64, main["aspects"])
-            _altitude_mountain(fig, 872, 414, 54, 42, main["above_m"], main["below_m"])
+            texts.append(_text(fig, right + 8, 412,
+                               PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13))
+            # pictograms right after the text (further left for a short level
+            # name), centred on the big figures; the mountain and its altitude
+            # form one pictogram
+            x = _right_edge(fig, *texts) + 12
+            _aspect_rose(fig, x, 395, 72, main["aspects"])
+            x += 72 + 12
+            _altitude_mountain(fig, x, 415, 62, 48, main["above_m"], main["below_m"])
             if main["above_m"] or main["below_m"]:
-                _text(fig, 899, 400, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                _text(fig, x + 31, 400, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
                       ha="center")
         until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
         _text(fig, 548, 380, f"until {until:%a %H:%M}", 12, P["MUTED"])
