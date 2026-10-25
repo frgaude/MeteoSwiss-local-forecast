@@ -40,7 +40,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   interest, 3018 m; `find_point` ignores accents, "touno" finds it).
 - PV (user's real system, 25 Oct 2026): 7.905 kWp, derate 0.88, tilt 29°,
   azimuth 212° (180 = south). Home shows today's estimate, tomorrow's from
-  1 h after sunset (`lf._solar_day`); the hourly mini chart has a kW scale.
+  1 h after sunset (`lf._solar_day`); the hourly mini chart has a fixed scale
+  0 to round(kWp) = 8 kW, kW on the left and % of that on the right.
 - Charts (all screens): 39 h from the last local 00:00 / 12:00 (so the past
   hours show too), a tick every 3 h (weekday at midnight), gridlines at
   00:00 / 12:00, a vertical line at render time (`lf._chart_window`,

@@ -192,19 +192,24 @@ def home(view):
     _value_unit(fig, 470, 412, f"{solar['kwh']:.1f}", "kWh", 40)
     _text(fig, 470, 380, f"{'day after' if tomorrow else 'tomorrow'} {solar['next_kwh']:.1f} kWh", 13,
           P["MUTED"])
-    ax = _axes(fig, 768, 382, 177, 80)
+    ax = _axes(fig, 764, 382, 140, 80)
     ax.bar(solar["hours"], solar["hourly_kw"], width=0.85, align="edge", color=P["SUN"])
     if not tomorrow:
         now = datetime.now(lf.TZ)
         ax.axvline(now.hour + now.minute / 60, color=P["INK"], lw=1.5, ls=":")
-    # fixed scale from 0 to the system's peak power, so days compare
-    top = solar["kwp"]
+    # fixed scale from 0 to the system's peak power (whole kW), so days
+    # compare: kW on the left, % of that peak on the right
+    top = max(1, round(solar["kwp"]))
     step = 2 if top <= 12 else 5
-    ticks = list(range(0, int(top) + 1, step))
-    if top - ticks[-1] >= step / 2:
-        ticks.append(top)
+    ticks = list(range(0, top + 1, step))
     ax.set_ylim(0, top)
-    ax.set_yticks(ticks, [f"{v:g}" if v == int(v) else f"{v:.1f}" for v in ticks])
+    ax.set_yticks(ticks)
+    pct = ax.twinx()
+    pct.set_ylim(0, top)
+    pct.set_yticks(ticks[1:], [f"{v / top * 100:.0f}%" for v in ticks[1:]])
+    pct.tick_params(length=0, labelsize=10, labelcolor=P["MUTED"])
+    for sp in pct.spines.values():
+        sp.set_visible(False)
     for v in ticks[1:]:
         ax.axhline(v, color=P["GRID"], lw=1, zorder=0)
     ax.set_xlim(5, 21)
@@ -212,7 +217,7 @@ def home(view):
     for s in ("top", "right", "left"):
         ax.spines[s].set_visible(False)
     ax.tick_params(length=0, labelsize=10)
-    _text(fig, 768, 468, "kW", 10, P["MUTED"], weight="bold", ha="right")
+    _text(fig, 764, 468, "kW", 10, P["MUTED"], weight="bold", ha="right")
 
     # next hours: temperature line over rain/snow bars
     h = view["hourly"]
