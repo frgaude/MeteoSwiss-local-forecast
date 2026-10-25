@@ -381,6 +381,15 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=39, days=5):
     }
 
 
+def wind_chill(temp, kmh):
+    """Felt temperature (°C) from air temperature and wind (km/h), the
+    North American / UK wind chill index; equal to `temp` above 10 °C or in
+    light wind, where it does not apply."""
+    v = np.power(np.maximum(kmh, 0), 0.16)
+    wc = 13.12 + 0.6215 * temp - 11.37 * v + 0.3965 * temp * v
+    return np.where((temp <= 10) & (kmh > 4.8), np.minimum(wc, temp), temp)
+
+
 def sun_events(lat, lon, start, end):
     """Sunrise and sunset times between `start` and `end` (ISO strings), for
     the standard horizon (sun centre 0.833° below it, for refraction); within
@@ -393,8 +402,9 @@ def sun_events(lat, lon, start, end):
 
 
 def mountain_view(run, hourly, point, bulletin=None, hours=39):
-    """Summit forecast: now with the 0° level, new snow and sunshine over the
-    next 48 h and the avalanche bulletin (as on the chalet screen), then
+    """Summit forecast: now with the felt temperature (wind chill) and the 0°
+    level, new snow and sunshine over the next 48 h and the avalanche
+    bulletin (as on the chalet screen), then
     `hours` from the last 00:00 / 12:00 of wind, sunshine with sunrise and
     sunset, snow, rain and temperature."""
     snow = snow_fraction(hourly, point["alt"])
@@ -406,6 +416,7 @@ def mountain_view(run, hourly, point, bulletin=None, hours=39):
         "view": "mountain", "name": point["name"], "alt": point["alt"],
         "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
+                "feels": _r(float(wind_chill(now["tre200h0"], now["fu3010h0"]))),
                 "freezing_m": int(now["zprfr0hs"])},
         "snow_next_cm": _r(snow_cm[next48.index].sum()),
         "sun_next_h": _r(next48["sre000h0"].sum() / 60),

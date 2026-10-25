@@ -15,10 +15,11 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
 - Mountain (Le Toûno): top panel shared with the chalet
   (`screens._snow_avalanche_panel`: now + 0° level, new snow / sunshine 48 h,
-  SLF bulletin, same region CH-4124); then, like the MeteoSwiss app: wind row
+  SLF bulletin, same region CH-4124), plus "feels like" (wind chill,
+  `lf.wind_chill`) above the temperature; then, like the MeteoSwiss app: wind row
   (arrow + mean km/h every 3 h), sunshine min/h with sunrise/sunset
   (`lf.sun_events`, standard horizon, within ~3 min of MeteoSwiss), and the
-  chalet-style snow/rain/temperature chart. No daily pane, no wind-now block.
+  chalet-style snow/rain/temperature chart. No daily pane, no wind-now block or compass.
 
 Describe all data as forecasts (e.g. "forecast for now", not "current").
 

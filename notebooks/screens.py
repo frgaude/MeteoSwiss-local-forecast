@@ -384,6 +384,8 @@ def _snow_avalanche_panel(fig, view):
     """Top panel of chalet and mountain: forecast for now with the 0° level,
     new snow and sunshine over the next 48 h, and the avalanche bulletin."""
     now = view["now"]
+    if "feels" in now:                        # mountain: wind chill above the temperature
+        _text(fig, 121, 470, f"feels like {_deg(now['feels'])}", 13, P["MUTED"])
     _icon(fig, now["icon"], 8, 368, 105)
     _text(fig, 118, 412, _deg(now['temp']), 50, weight="bold")
     _text(fig, 121, 380, f"0° level {now['freezing_m']} m", 13, P["MUTED"])
