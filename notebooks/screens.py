@@ -17,7 +17,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.dates import DateFormatter, HourLocator
-from matplotlib.patches import Rectangle, Wedge
+from matplotlib.patches import Polygon, Rectangle
 from PIL import Image
 
 import icons
@@ -28,14 +28,14 @@ W, H = 960, 540
 GREY = {"INK": "#000000", "MUTED": "#444444", "GRID": "#bbbbbb", "NIGHT": "#eeeeee",
         "TEMP": "#000000", "RAIN": "#888888", "SNOW": "#cccccc",
         "SUN": "#555555", "WIND": "#000000", "BAND": "#cccccc", "GUST": "#000000",
-        "ROSE": "#444444", "ICONS": icons.GREY,
+        "SLF": "#333333", "ICONS": icons.GREY,
         # EAWS danger levels 1–5, light to dark; white text from level 3
         "DANGER": {1: "#eeeeee", 2: "#bbbbbb", 3: "#777777", 4: "#333333", 5: "#000000"},
         "DANGER_WHITE_FROM": 3}
 COLOUR = {"INK": "#1d1d1f", "MUTED": "#6e6e73", "GRID": "#dee2e6", "NIGHT": "#f1f3f5",
           "TEMP": "#d9480f", "RAIN": "#1c7ed6", "SNOW": "#74c0fc",
           "SUN": "#f59f00", "WIND": "#0b7285", "BAND": "#99e9f2", "GUST": "#c92a2a",
-          "ROSE": None, "ICONS": icons.COLOUR,
+          "SLF": "#1f5c88", "ICONS": icons.COLOUR,
           # official EAWS danger level colours
           "DANGER": {1: "#ccff66", 2: "#ffff00", 3: "#ff9900", 4: "#ff0000", 5: "#9e1313"},
           "DANGER_WHITE_FROM": 4}
@@ -260,19 +260,53 @@ def boat(view):
 
 # ---------------------------------------------------------------------------
 
-def _aspect_rose(fig, x, y, size, aspects, color):
-    """Exposure compass: highlighted sectors are the critical aspects."""
+DANGER_NAMES = {1: "Low", 2: "Moderate", 3: "Considerable", 4: "High", 5: "Very high"}
+PROBLEM_NAMES = {"new_snow": "new snow", "wind_slab": "wind slab", "persistent_weak_layers": "weak layers",
+                 "wet_snow": "wet snow", "gliding_snow": "gliding snow", "cornices": "cornices",
+                 "favourable_situation": "favourable", "no_distinct_avalanche_problem": "no clear problem"}
+
+
+def _aspect_rose(fig, x, y, size, aspects):
+    """SLF exposure star: 8 kite-shaped petals, the critical aspects filled,
+    N E S W written on their petals."""
     ax = _axes(fig, x, y, size, size)
-    ax.set_xlim(-1.3, 1.3)
-    ax.set_ylim(-1.3, 1.3)
+    ax.set_xlim(-1.05, 1.05)
+    ax.set_ylim(-1.05, 1.05)
     ax.set_aspect("equal")
     ax.axis("off")
     for i, a in enumerate(ASPECTS):
-        # compass bearing → matplotlib angle (counter-clockwise from east)
-        mid = 90 - i * 45
-        ax.add_patch(Wedge((0, 0), 1, mid - 22.5, mid + 22.5, width=0.55,
-                           fc=color if a in aspects else "white", ec=P["INK"], lw=1))
-    ax.text(0, 1.2, "N", ha="center", va="center", fontsize=11, weight="bold", color=P["INK"])
+        b = np.radians(90 - i * 45)          # compass bearing → maths angle
+        side = 0.72
+        kite = [(0, 0), (side * np.cos(b - np.pi / 8), side * np.sin(b - np.pi / 8)),
+                (np.cos(b), np.sin(b)), (side * np.cos(b + np.pi / 8), side * np.sin(b + np.pi / 8))]
+        on = a in aspects
+        ax.add_patch(Polygon(kite, closed=True, fc=P["SLF"] if on else "white", ec=P["INK"], lw=1.2,
+                             joinstyle="round"))
+        if len(a) == 1:
+            ax.text(0.6 * np.cos(b), 0.6 * np.sin(b), a, ha="center", va="center", fontsize=10,
+                    weight="bold", color="white" if on else P["INK"])
+
+
+def _altitude_mountain(fig, x, y, w, h, above, below):
+    """SLF altitude pictogram: a mountain filled above `above` m (or below
+    `below` m, or entirely), with the altitude written beside the line."""
+    ax = _axes(fig, x, y, w, h)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    level = 0.5                              # the threshold line, half way up
+    outline = [(0.02, 0.0), (0.98, 0.0), (0.84, level), (0.66, 0.96), (0.53, 0.72), (0.42, 0.82),
+               (0.16, level)]
+    clip = (Rectangle((0, level), 1, 1) if above else Rectangle((0, 0), 1, level) if below
+            else Rectangle((0, 0), 1, 1))
+    ax.add_patch(Polygon(outline, closed=True, fc="white", ec="none"))
+    filled = Polygon(outline, closed=True, fc=P["SLF"], ec="none")
+    ax.add_patch(filled)
+    clip.set_transform(ax.transData)
+    filled.set_clip_path(clip)
+    ax.add_patch(Polygon(outline, closed=True, fc="none", ec=P["INK"], lw=1.2, joinstyle="round"))
+    if above or below:
+        ax.plot([0.16, 0.84], [level, level], color=P["INK"], lw=1.2)
 
 
 def chalet(view):
@@ -290,25 +324,28 @@ def chalet(view):
     _text(fig, 336 + 32 * len(snow), 412, "cm", 15, P["MUTED"])
     _text(fig, 330, 380, f"sunshine 48 h: {sum(h['sun_min']) / 60:.0f} h", 13, P["MUTED"])
 
-    # avalanche bulletin
+    # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
+    # exposure star and altitude mountain of the main avalanche problem
     av = view.get("avalanche")
     _label(fig, 590, 462, "avalanche danger")
     if av:
         fill = P["DANGER"][av["level"]]
         fig.patches.append(Rectangle((590 / W, 372 / H), 66 / W, 72 / H, transform=fig.transFigure,
                                      fc=fill, ec=P["INK"], lw=1.5))
-        _text(fig, 623, 408, f"{av['level']}{av['sub'] if av['sub'] != '=' else ''}", 30,
+        _text(fig, 623, 408, f"{av['level']}{av['sub']}", 30,
               "white" if av["level"] >= P["DANGER_WHITE_FROM"] else P["INK"], weight="bold",
               ha="center", va="center")
+        _text(fig, 666, 428, DANGER_NAMES[av["level"]], 14, weight="bold")
         main = max(av["problems"], key=lambda p: p["level"] or 0) if av["problems"] else None
         if main:
-            elev = (f"above {main['above_m']} m" if main["above_m"] else
-                    f"below {main['below_m']} m" if main["below_m"] else "all altitudes")
-            _text(fig, 668, 428, main["type"].replace("_", " "), 14, weight="bold")
-            _text(fig, 668, 405, elev, 13)
-            _aspect_rose(fig, 845, 365, 100, main["aspects"], P["ROSE"] or fill)
-        _text(fig, 668, 380, f"{av['region']} · {datetime.fromisoformat(av['valid_from']):%d.%m}",
-              11, P["MUTED"])
+            _text(fig, 666, 405, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
+            _aspect_rose(fig, 780, 366, 88, main["aspects"])
+            _altitude_mountain(fig, 870, 398, 76, 52, main["above_m"], main["below_m"])
+            if main["above_m"] or main["below_m"]:
+                _text(fig, 908, 378, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                      ha="center")
+        until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
+        _text(fig, 666, 380, f"until {until:%a %H:%M}", 11, P["MUTED"])
     else:
         _text(fig, 590, 412, "no bulletin", 15)
         _text(fig, 590, 388, "outside the season", 13, P["MUTED"])

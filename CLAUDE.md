@@ -78,6 +78,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   (GPIO0/12/13) are also held through deep sleep. Serial prints ms stamps,
   the reset reason, and the previous boot's last step (kept in RTC memory).
   Schematic: LilyGo-EPD47 repo, schematic/T5-ePaper-S3-V2.3.pdf.
+  Open: the user still sees occasional brownouts after the fix (reported
+  25 Oct 2026, "seldom, nothing major", not investigated). Next step if
+  needed: USB serial shows the reset reason and the previous boot's last step.
 - Screen clear: the driver's epd_clear() flashes black/white 4 times
   (~1.2 s). Hourly / power-on / reset redraws keep 4; button wakes and
   switches use `LIGHT_CLEAR_CYCLES` (platformio.ini build flag) = 1: no
