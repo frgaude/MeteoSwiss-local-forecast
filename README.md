@@ -1,4 +1,4 @@
-# MeteoSwiss local forecast — home, boat, chalet
+# MeteoSwiss local forecast — home, boat, chalet, mountain
 
 Three forecast views built on the MeteoSwiss local forecast
 (`ch.meteoschweiz.ogd-local-forecasting`, OGD, updated hourly), prototyped as
@@ -9,6 +9,7 @@ notebooks before moving to a LilyGO T5 4.7" e-paper (ESP32-S3).
 | `notebooks/Home.ipynb` | forecast for now, estimated solar production today, 48 h temperature + rain/snow, daily outlook (min/max, precipitation, sunshine) |
 | `notebooks/Boat.ipynb` | 48 h wind in knots: mean with 10–90 % range, gusts, direction |
 | `notebooks/Chalet.ipynb` | estimated new snow and sunshine, daily outlook, SLF avalanche bulletin (level, problem, aspects, altitude) |
+| `notebooks/Mountain.ipynb` | summit: temperature and wind chill, wind in km/h with 10–90 % range, gusts, direction, 0° level against the summit, daily outlook with new snow |
 
 `notebooks/localforecast.py` does the work: it streams each parameter CSV
 (~33 MB, all ~5,800 points), keeps only your points, caches them under
@@ -25,7 +26,7 @@ frame buffer the LilyGo-EPD47 driver draws.
     pip install -r requirements.txt
 
 Then open the notebooks in VS Code or Jupyter and edit the configuration cell
-(point ids, PV system, SLF region; currently Renens, Lutry and St-Luc).
+(point ids, PV system, SLF region; currently Renens, Lutry, Chandolin and Le Toûno).
 
 ## On the e-paper
 
@@ -42,7 +43,7 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
   three an hour) and deploys `site/` to GitHub Pages. In the
   repository settings, set Pages → Source to "GitHub Actions".
 - `firmware/` is a PlatformIO project (`src/main.cpp`). Each hourly wake
-  (and power on / reset) downloads all three screens into flash and shows the
+  (and power on / reset) downloads all four screens into flash and shows the
   current one; the button (GPIO21) wakes the board and shows the next screen
   from flash, without Wi-Fi, then stays awake 20 s after the last press so
   you can keep switching. Copy `include/secrets.h.example` to

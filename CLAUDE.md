@@ -1,6 +1,6 @@
 # Project context
 
-Three forecast views (home, boat, chalet) from the MeteoSwiss local forecast
+Four forecast views (home, boat, chalet, mountain) from the MeteoSwiss local forecast
 (OGD, `ch.meteoschweiz.ogd-local-forecasting`), inspired by
 https://github.com/MeteoSwiss/opendata-localforecast-demos. Plan: prototype in
 notebooks first, later an ESP32 app with a display. The ESP32 should receive
@@ -13,6 +13,9 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
 - Boat: wind in knots: mean with 10–90 % range, gusts, direction (Lake Geneva).
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).
+- Mountain (Le Toûno): temperature + wind chill ("feels like"), wind in km/h
+  (mean, 10–90 %, gusts, direction), 0° level against the summit, daily outlook
+  with new snow; temperature dashed in the chart (wind is also black on e-ink).
 
 Describe all data as forecasts (e.g. "forecast for now", not "current").
 
@@ -25,7 +28,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
 - SLF bulletin: `https://aws.slf.ch/api/bulletin/caaml/en/json`, empty outside
   the season; `?activeAt=<ISO time>` returns past bulletins for testing.
 - Locations: home Renens VD 102000/2, boat Lutry 109500/2 (lake shore,
-  392 m), chalet St-Luc 396122/2 (1658 m), SLF region CH-4124 Val d'Anniviers.
+  392 m), chalet Chandolin 396123/2 (1900 m, was St-Luc until 25 Oct 2026),
+  SLF region CH-4124 Val d'Anniviers; mountain Le Toûno 1119/3 (point of
+  interest, 3018 m; `find_point` ignores accents, "touno" finds it).
 - PV: the placeholder (10 kWp, 30°, south) stays until the user says otherwise.
 - Outlook: home and chalet share the daily pane (`lf._days`,
   `screens._daily`); the 6 half-day outlook was dropped on 23 Oct 2026.
@@ -52,8 +57,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   often starts scheduled jobs late.
 - Rendering is server-side: `render.py` → `site/` → GitHub Pages via
   `.github/workflows/render.yml`. One T5: the PlatformIO project `firmware/` (`src/main.cpp`)
-  downloads all three `<view>.raw` into LittleFS each hour; the button
-  (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet from flash with
+  downloads all four `<view>.raw` into LittleFS each hour; the button
+  (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet → mountain from flash with
   no Wi-Fi. Current view is kept in NVS (Preferences). After a button wake or power
   on / reset it stays awake 20 s after the last press (`AWAKE_MS`, button
   polled every 10 ms by an esp_timer with a 30 ms debounce, also during a
@@ -61,6 +66,9 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   Tested on the T5 23 Oct 2026: one log line per press, no double counts; hourly timer wakes sleep at
   once. `epd_poweroff()` between draws, `epd_poweroff_all()` only before
   deep sleep (it zeroes the driver's config register).
+- Parked (25 Oct 2026): rain whiskers (10–90 %, rreq10h0/rreq90h0) like the
+  MeteoSwiss app. Rain axis is 0–8 mm/h minimum like the app; the snow legend
+  entry only shows when snow is forecast.
 - Brownouts on button wake (25 Oct 2026): ~1 wake in 4 reset (brownout or
   full power loss, even on USB + battery), dying inside epd_init(), so the
   board restarted and re-downloaded (~20 s). Cause: epd_init switching the

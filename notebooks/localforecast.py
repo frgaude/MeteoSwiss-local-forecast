@@ -1,5 +1,5 @@
 """MeteoSwiss local forecasts (collection ch.meteoschweiz.ogd-local-forecasting)
-for a few points, reduced to small per-screen payloads (home, boat, chalet).
+for a few points, reduced to small per-screen payloads (home, boat, chalet, mountain).
 
 Each parameter is one CSV per run covering all ~5,800 points (~33 MB), so
 `fetch` streams it once and keeps only the rows of the requested points,
@@ -11,6 +11,7 @@ Avalanche Research SLF (aws.slf.ch, CAAML JSON).
 """
 import json
 import os
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -37,6 +38,9 @@ BOAT_PARAMS = ["fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
                "fu3q90h1", "tre200h0", "jww003i0"]
 CHALET_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "rp0003i0",
                  "zprfr0hs", "sre000h0", "jp2000d0", "tre200pn", "tre200px"]
+MOUNTAIN_PARAMS = ["tre200h0", "jww003i0", "rre150h0", "zprfr0hs", "sre000h0",
+                   "fu3010h0", "fu3010h1", "dkl010h0", "fu3q10h0", "fu3q90h0",
+                   "jp2000d0", "tre200pn", "tre200px"]
 DAILY = {"jp2000d0", "tre200pn", "tre200px", "rka150p0", "rreq10p0", "rreq90p0"}
 
 
@@ -81,14 +85,21 @@ def points():
     return pd.read_csv(path, sep=";", encoding="latin-1")
 
 
+def _plain(text):
+    """Lower case without accents, so "touno" finds "Le Toûno"."""
+    return "".join(c for c in unicodedata.normalize("NFD", text.lower())
+                   if unicodedata.category(c) != "Mn")
+
+
 def find_point(text):
-    """Points whose name, station abbreviation or postal code contains `text`."""
+    """Points whose name, station abbreviation or postal code contains `text`
+    (case and accents ignored)."""
     p = points()
     hay = (p["point_name"].astype(str) + " " + p["station_abbr"].fillna("").astype(str)
            + " " + p["postal_code"].fillna("").astype(str))
     cols = ["point_id", "point_type_id", "point_name", "station_abbr", "postal_code",
             "point_type_en", "point_height_masl"]
-    return p.loc[hay.str.contains(text, case=False), cols]
+    return p.loc[hay.map(_plain).str.contains(_plain(text), regex=False), cols]
 
 
 def point_info(key):
@@ -345,6 +356,44 @@ def chalet_view(run, hourly, daily, point, bulletin=None, hours=48, days=5):
         },
         "days": _days(hourly, daily, days, snow_cm),
         "avalanche": bulletin,
+    }
+
+
+def wind_chill(temp, kmh):
+    """Felt temperature (°C) from air temperature and wind (km/h), the
+    North American / UK wind chill index; equal to `temp` above 10 °C or in
+    light wind, where it does not apply."""
+    v = np.power(np.maximum(kmh, 0), 0.16)
+    wc = 13.12 + 0.6215 * temp - 11.37 * v + 0.3965 * temp * v
+    return np.where((temp <= 10) & (kmh > 4.8), np.minimum(wc, temp), temp)
+
+
+def mountain_view(run, hourly, daily, point, hours=48, days=5):
+    """Summit forecast: now (temperature, felt temperature, wind in km/h,
+    0° level), the next `hours` of wind with its 10–90 % range, gusts,
+    direction and temperature, and a daily outlook with new snow."""
+    snow_cm = hourly["rre150h0"] * snow_fraction(hourly, point["alt"])
+    nxt = _upcoming(hourly, hours)
+    now = _now_row(hourly)
+    return {
+        "view": "mountain", "name": point["name"], "alt": point["alt"],
+        "run": run_time(run).isoformat(),
+        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
+                "feels": _r(float(wind_chill(now["tre200h0"], now["fu3010h0"]))),
+                "wind_kmh": _r(now["fu3010h0"], 0), "gust_kmh": _r(now["fu3010h1"], 0),
+                "dir": int(now["dkl010h0"]), "freezing_m": int(now["zprfr0hs"])},
+        "snow_next_cm": _r(snow_cm[nxt.index].sum()),
+        "hourly": {
+            "time": [t.isoformat() for t in nxt.index],
+            "temp": [_r(v) for v in nxt["tre200h0"]],
+            "wind_kmh": [_r(v) for v in nxt["fu3010h0"]],
+            "wind_q10_kmh": [_r(v) for v in nxt["fu3q10h0"]],
+            "wind_q90_kmh": [_r(v) for v in nxt["fu3q90h0"]],
+            "gust_kmh": [_r(v) for v in nxt["fu3010h1"]],
+            "dir": [int(v) for v in nxt["dkl010h0"]],
+            "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
+        },
+        "days": _days(hourly, daily, days, snow_cm),
     }
 
 

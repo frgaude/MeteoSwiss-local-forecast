@@ -1,10 +1,10 @@
-// Forecast screens (home, boat, chalet) rendered hourly by render.py and
+// Forecast screens (home, boat, chalet, mountain) rendered hourly by render.py and
 // published on GitHub Pages as 4-bit frame buffers.
 //
 // Board: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8), library
 // LilyGo-EPD47 (branch esp32s3); build settings in platformio.ini.
 //
-// Power on, reset, or the hourly timer: download all three screens into
+// Power on, reset, or the hourly timer: download all four screens into
 //   flash (LittleFS), full refresh with the current one, deep sleep until
 //   HH:FETCH_MINUTE. Failed downloads keep the previous copy; retry after
 //   RETRY_S.
@@ -30,7 +30,7 @@
 #include "utilities.h"
 #include "secrets.h"  // WIFI_SSID, WIFI_PASSWORD, BASE_URL (copy secrets.h.example)
 
-const char *VIEWS[] = {"home", "boat", "chalet"};
+const char *VIEWS[] = {"home", "boat", "chalet", "mountain"};
 const int N_VIEWS = sizeof(VIEWS) / sizeof(VIEWS[0]);
 const int FETCH_MINUTE = 40;  // render job runs at :12 and :32, GitHub may delay it
 const int RETRY_S = 10 * 60;

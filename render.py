@@ -1,4 +1,4 @@
-"""Render the home, boat and chalet screens for the LilyGO T5 4.7" e-paper.
+"""Render the home, boat, chalet and mountain screens for the LilyGO T5 4.7" e-paper.
 
 Writes into site/ (published by GitHub Pages, see .github/workflows/render.yml):
 
@@ -25,7 +25,8 @@ import screens  # noqa: E402
 # ── Configuration (same as the notebooks' configuration cells) ──────────────
 HOME = (102000, 2)        # Renens VD
 BOAT = (109500, 2)        # Lutry, lake shore
-CHALET = (396122, 2)      # St-Luc, 1658 m
+CHALET = (396123, 2)      # Chandolin, 1900 m
+MOUNTAIN = (1119, 3)      # Le Toûno, 3018 m (point of interest)
 SLF_REGION = "CH-4124"    # Val d'Anniviers
 PV = {"kwp": 10, "tilt": 30, "azimuth": 180}
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,9 +34,10 @@ PV = {"kwp": 10, "tilt": 30, "azimuth": 180}
 
 def main(out):
     os.makedirs(out, exist_ok=True)
-    # one pass over each parameter CSV for all three points
-    params = sorted(set(lf.HOME_PARAMS) | set(lf.BOAT_PARAMS) | set(lf.CHALET_PARAMS))
-    run, data = lf.fetch([HOME, BOAT, CHALET], params)
+    # one pass over each parameter CSV for all points
+    params = sorted(set(lf.HOME_PARAMS) | set(lf.BOAT_PARAMS) | set(lf.CHALET_PARAMS)
+                    | set(lf.MOUNTAIN_PARAMS))
+    run, data = lf.fetch([HOME, BOAT, CHALET, MOUNTAIN], params)
     try:
         bulletin = lf.slf_bulletin(SLF_REGION)
     except Exception as e:  # the screen still works without it
@@ -45,6 +47,7 @@ def main(out):
         "home": (screens.home, lf.home_view(run, *data[HOME], lf.point_info(HOME), PV)),
         "boat": (screens.boat, lf.boat_view(run, data[BOAT][0], lf.point_info(BOAT))),
         "chalet": (screens.chalet, lf.chalet_view(run, *data[CHALET], lf.point_info(CHALET), bulletin)),
+        "mountain": (screens.mountain, lf.mountain_view(run, *data[MOUNTAIN], lf.point_info(MOUNTAIN))),
     }
     for name, (draw, view) in views.items():
         img = screens.render(draw, view)

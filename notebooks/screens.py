@@ -99,10 +99,10 @@ def _precip_scale(ax, totals):
     ax.set_yticks(range(0, top + 1, top // 4))
 
 
-def _temp_axis(ax, t, temp, lo=None):
+def _temp_axis(ax, t, temp, lo=None, ls="-"):
     """Temperature line on a right-hand axis, with a white halo over bars."""
     ax2 = ax.twinx()
-    ax2.plot(t, temp, color=P["TEMP"], lw=3,
+    ax2.plot(t, temp, color=P["TEMP"], lw=3, ls=ls, label="temperature",
              path_effects=[pe.Stroke(linewidth=7, foreground="white"), pe.Normal()])
     ax2.set_ylim((min(temp) if lo is None else min(min(temp), lo)) - 2, max(temp) + 2)
     ax2.yaxis.set_major_locator(plt.MaxNLocator(4, integer=True))
@@ -176,7 +176,8 @@ def home(view):
     ax = _axes(fig, 62, 175, 830, 170)
     _shade_nights(ax, t)
     ax.bar(t, h["rain_mm"], width=1 / 26, color=P["RAIN"], label="rain")
-    ax.bar(t, h["snow_mm"], bottom=h["rain_mm"], width=1 / 26, color=P["SNOW"], label="snow")
+    ax.bar(t, h["snow_mm"], bottom=h["rain_mm"], width=1 / 26, color=P["SNOW"],
+           label="snow" if any(h["snow_mm"]) else None)
     _precip_scale(ax, [r + s for r, s in zip(h["rain_mm"], h["snow_mm"])])
     ax.set_ylabel("mm/h", fontsize=11)
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
@@ -194,6 +195,38 @@ def _beaufort(kt):
     return int(np.searchsorted([1, 4, 7, 11, 17, 22, 28, 34, 41, 48, 56, 64], kt, side="right"))
 
 
+def _compass(fig, x, y, size, direction):
+    """Compass with an arrow blowing from `direction` (degrees)."""
+    ax = _axes(fig, x, y, size, size, projection="polar")
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_yticks([])
+    ax.set_xticks(np.radians(range(0, 360, 90)), ["N", "E", "S", "W"], fontsize=11)
+    ax.tick_params(pad=-2)
+    ax.annotate("", xy=(np.radians(direction + 180), 0.9), xytext=(np.radians(direction), 0.9),
+                arrowprops=dict(arrowstyle="-|>,head_width=0.5,head_length=0.8", color=P["WIND"], lw=3.5))
+    ax.set_ylim(0, 1)
+
+
+def _wind_chart(ax, t, mean, q10, q90, gust, dirs, unit, top, step, arrows_at=0.83):
+    """Mean wind with its 10–90 % band, gusts, and direction arrows every 3 h
+    at `arrows_at` of the axis height."""
+    _shade_nights(ax, t)
+    ax.fill_between(t, q10, q90, color=P["BAND"], lw=0, label="10–90 %")
+    ax.plot(t, mean, color=P["WIND"], lw=3, label="mean wind")
+    ax.plot(t, gust, color=P["GUST"], lw=0, marker="o", ms=4, mfc="white", mew=1.5, label="gusts")
+    ax.set_ylim(0, top)
+    levels = [v for v in range(step, int(top), step)][:4]
+    for lvl in levels:
+        ax.axhline(lvl, color=P["GRID"], lw=1, zorder=0)
+    ax.set_yticks(levels)
+    ax.set_ylabel(unit, fontsize=12)
+    _time_axis(ax, t)
+    for ti, d in list(zip(t, dirs))[1::3]:
+        ax.text(ti, top * arrows_at, "↓", rotation=-d, ha="center", va="center", fontsize=18,
+                weight="bold", color=P["INK"])
+
+
 def boat(view):
     fig = _screen()
     _header(fig, view)
@@ -204,15 +237,7 @@ def boat(view):
     _text(fig, 22 + 50 * len(f"{now['wind_kt']:.0f}"), 405, "kt", 18, P["MUTED"])
     _text(fig, 18, 372, f"gusts {now['gust_kt']:.0f} kt · Bft {_beaufort(now['wind_kt'])}", 14,
           P["MUTED"])
-    ax = _axes(fig, 205, 362, 110, 110, projection="polar")
-    ax.set_theta_zero_location("N")
-    ax.set_theta_direction(-1)
-    ax.set_yticks([])
-    ax.set_xticks(np.radians(range(0, 360, 90)), ["N", "E", "S", "W"], fontsize=11)
-    ax.tick_params(pad=-2)
-    ax.annotate("", xy=(np.radians(now["dir"] + 180), 0.9), xytext=(np.radians(now["dir"]), 0.9),
-                arrowprops=dict(arrowstyle="-|>,head_width=0.5,head_length=0.8", color=P["WIND"], lw=3.5))
-    ax.set_ylim(0, 1)
+    _compass(fig, 205, 362, 110, now["dir"])
 
     # summary for the next 12 h
     t = _times(h)
@@ -227,23 +252,9 @@ def boat(view):
 
     # 48 h wind: mean with 10–90 % band, gusts, direction
     ax = _axes(fig, 52, 42, 893, 300)
-    _shade_nights(ax, t)
-    ax.fill_between(t, h["wind_q10_kt"], h["wind_q90_kt"], color=P["BAND"], lw=0, label="10–90 %")
-    ax.plot(t, h["wind_kt"], color=P["WIND"], lw=3, label="mean wind")
-    ax.plot(t, h["gust_kt"], color=P["GUST"], lw=0, marker="o", ms=4, mfc="white", mew=1.5,
-            label="gusts")
-    top = max(max(h["gust_q90_kt"]), 15) * 1.18
-    ax.set_ylim(0, top)
-    for lvl in (10, 20, 30, 40):
-        if lvl < top:
-            ax.axhline(lvl, color=P["GRID"], lw=1, zorder=0)
-    ax.set_yticks([v for v in (10, 20, 30, 40) if v < top])
-    ax.set_ylabel("kt", fontsize=12)
-    _time_axis(ax, t)
+    _wind_chart(ax, t, h["wind_kt"], h["wind_q10_kt"], h["wind_q90_kt"], h["gust_kt"], h["dir"],
+                "kt", top=max(max(h["gust_q90_kt"]), 15) * 1.18, step=10)
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=3, handlelength=1.5)
-    for ti, d in list(zip(t, h["dir"]))[1::3]:
-        ax.text(ti, top * 0.83, "↓", rotation=-d, ha="center", va="center", fontsize=18,
-                weight="bold", color=P["INK"])
     return fig
 
 
@@ -312,13 +323,57 @@ def chalet(view):
     _text(fig, 18, 324, "sun", 11, P["MUTED"], weight="bold")
     ax = _axes(fig, 62, 165, 830, 145)
     _shade_nights(ax, t)
-    ax.bar(t, h["snow_cm"], width=1 / 26, color=P["SNOW"], label="snow cm")
+    ax.bar(t, h["snow_cm"], width=1 / 26, color=P["SNOW"],
+           label="snow cm" if any(h["snow_cm"]) else None)
     ax.bar(t, h["rain_mm"], bottom=h["snow_cm"], width=1 / 26, color=P["RAIN"], label="rain mm")
     _precip_scale(ax, [s + r for s, r in zip(h["snow_cm"], h["rain_mm"])])
     ax.legend(loc="upper left", fontsize=11, frameon=False, ncol=2, handlelength=1)
     _time_axis(ax, t)
     ax2 = _temp_axis(ax, t, h["temp"], lo=0)
     ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
+
+    # daily outlook
+    _daily(fig, view["days"], "snow")
+    return fig
+
+
+# ---------------------------------------------------------------------------
+
+def mountain(view):
+    fig = _screen()
+    _header(fig, view, f" · {view['alt']:.0f} m")
+    now, h = view["now"], view["hourly"]
+
+    # now: icon, temperature and felt temperature
+    _icon(fig, now["icon"], 8, 368, 105)
+    _text(fig, 118, 412, _deg(now["temp"]), 50, weight="bold")
+    _text(fig, 121, 380, f"feels like {_deg(now['feels'])}", 13, P["MUTED"])
+
+    # wind in km/h, as MeteoSwiss gives it for mountains
+    _label(fig, 300, 462, "wind")
+    _text(fig, 300, 412, f"{now['wind_kmh']:.0f}", 42, weight="bold")
+    _text(fig, 308 + 36 * len(f"{now['wind_kmh']:.0f}"), 412, "km/h", 15, P["MUTED"])
+    _text(fig, 300, 380, f"gusts {now['gust_kmh']:.0f} km/h", 13, P["MUTED"])
+    _compass(fig, 480, 362, 110, now["dir"])
+
+    # zero-degree level against the summit
+    _label(fig, 650, 462, "0° level")
+    _text(fig, 650, 415, f"{now['freezing_m']} m", 26, weight="bold")
+    gap = now["freezing_m"] - view["alt"]
+    _text(fig, 650, 385, f"{abs(gap):.0f} m {'above' if gap >= 0 else 'below'} the summit", 13,
+          P["MUTED"])
+
+    # 48 h: wind with range, gusts and direction; temperature (dashed) on the right
+    t = _times(h)
+    ax = _axes(fig, 62, 165, 830, 180)
+    # headroom above the data for the legend and the direction arrows
+    top = max(max(h["gust_kmh"]), max(h["wind_q90_kmh"]), 30) * 1.5
+    _wind_chart(ax, t, h["wind_kmh"], h["wind_q10_kmh"], h["wind_q90_kmh"], h["gust_kmh"], h["dir"],
+                "km/h", top=top, step=20 if top > 60 else 10, arrows_at=0.76)
+    ax2 = _temp_axis(ax, t, h["temp"], ls="--")
+    ax2.axhline(0, color=P["TEMP"], lw=1, ls=":")
+    handles = ax.get_legend_handles_labels()[0] + ax2.get_legend_handles_labels()[0]
+    ax.legend(handles=handles, loc="upper left", fontsize=11, frameon=False, ncol=4, handlelength=1.5)
 
     # daily outlook
     _daily(fig, view["days"], "snow")
