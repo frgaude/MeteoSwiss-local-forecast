@@ -249,13 +249,17 @@ def _days(hourly, daily, n, snow_cm=None):
     return out
 
 
+# Hours are rounded in UTC: in local time the repeated hour when summer time
+# ends (02:00–03:00) is ambiguous and pandas refuses to round it. Swiss time
+# is a whole number of hours from UTC, so the hour boundaries are the same.
+
 def _now_row(hourly):
-    now = pd.Timestamp.now(TZ).ceil("h")
+    now = pd.Timestamp.now("UTC").ceil("h")
     return hourly.loc[hourly.index >= now].iloc[0]
 
 
 def _upcoming(hourly, hours):
-    now = pd.Timestamp.now(TZ).floor("h")
+    now = pd.Timestamp.now("UTC").floor("h")
     return hourly[(hourly.index > now) & (hourly.index <= now + pd.Timedelta(hours=hours))]
 
 
