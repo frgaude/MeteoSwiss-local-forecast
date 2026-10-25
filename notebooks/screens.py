@@ -18,7 +18,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.dates import HourLocator, num2date
-from matplotlib.patches import Polygon, Rectangle
+from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
 from PIL import Image
 
 import icons
@@ -28,11 +28,12 @@ W, H = 960, 540
 # greys each land on one of the panel's 16 levels (multiples of 0x11)
 GREY = {"INK": "#000000", "MUTED": "#444444", "GRID": "#bbbbbb", "NIGHT": "#eeeeee",
         "TEMP": "#000000", "RAIN": "#888888", "SNOW": "#cccccc",
-        "SUN": "#555555", "WIND": "#000000", "BAND": "#cccccc", "GUST": "#000000",
+        "SUN": "#aaaaaa", "WIND": "#000000", "BAND": "#cccccc", "GUST": "#000000",
         "SLF": "#333333", "ICONS": icons.GREY,
-        # EAWS danger levels 1–5, light to dark; white text from level 3
-        "DANGER": {1: "#eeeeee", 2: "#bbbbbb", 3: "#777777", 4: "#333333", 5: "#000000"},
-        "DANGER_WHITE_FROM": 3}
+        # EAWS danger levels 1–5, light to mid grey so the black figure stays
+        # readable on the T5
+        "DANGER": {1: "#eeeeee", 2: "#dddddd", 3: "#bbbbbb", 4: "#999999", 5: "#777777"},
+        "DANGER_WHITE_FROM": 6}
 COLOUR = {"INK": "#1d1d1f", "MUTED": "#6e6e73", "GRID": "#dee2e6", "NIGHT": "#f1f3f5",
           "TEMP": "#d9480f", "RAIN": "#1c7ed6", "SNOW": "#74c0fc",
           "SUN": "#f59f00", "WIND": "#0b7285", "BAND": "#99e9f2", "GUST": "#c92a2a",
@@ -290,6 +291,20 @@ PROBLEM_NAMES = {"new_snow": "new snow", "wind_slab": "wind slab", "persistent_w
                  "favourable_situation": "favourable", "no_distinct_avalanche_problem": "no clear problem"}
 
 
+def _danger_badge(fig, x, baseline, level, text):
+    """Danger level figure ("2=") on a rounded fill in the level's colour, no
+    frame; its baseline matches the big figures of the other blocks."""
+    w, h, below = 62, 56, 9                   # px; the fill reaches `below` under the baseline
+    ax = _axes(fig, x, baseline - below, w, h)
+    ax.set_xlim(0, w)
+    ax.set_ylim(0, h)
+    ax.axis("off")
+    ax.add_patch(FancyBboxPatch((0, 0), w, h, boxstyle="round,pad=0,rounding_size=9",
+                                fc=P["DANGER"][level], ec="none"))
+    ax.text(w / 2, below, text, ha="center", va="baseline", fontsize=30, weight="bold",
+            color="white" if level >= P["DANGER_WHITE_FROM"] else P["INK"])
+
+
 def _aspect_rose(fig, x, y, size, aspects):
     """SLF exposure star: 8 kite-shaped petals, the critical aspects filled,
     N E S W written on their petals."""
@@ -409,29 +424,26 @@ def _snow_avalanche_panel(fig, view):
 
     # avalanche bulletin, drawn like the SLF: level with its sub-level (- = +),
     # exposure star and altitude mountain of the main avalanche problem
+    # Rows as in the first two blocks: label at 462, big figures on the 412
+    # baseline (pictograms centred on them), small text at 380.
     av = view.get("avalanche")
     _label(fig, 590, 462, "avalanche danger")
     if av:
-        fill = P["DANGER"][av["level"]]
-        fig.patches.append(Rectangle((590 / W, 372 / H), 66 / W, 72 / H, transform=fig.transFigure,
-                                     fc=fill, ec=P["INK"], lw=1.5))
-        _text(fig, 623, 408, f"{av['level']}{av['sub']}", 30,
-              "white" if av["level"] >= P["DANGER_WHITE_FROM"] else P["INK"], weight="bold",
-              ha="center", va="center")
-        _text(fig, 666, 428, DANGER_NAMES[av["level"]], 13, weight="bold")
+        _danger_badge(fig, 590, 412, av["level"], f"{av['level']}{av['sub']}")
+        _text(fig, 660, 433, DANGER_NAMES[av["level"]], 13, weight="bold")
         main = max(av["problems"], key=lambda p: p["level"] or 0) if av["problems"] else None
         if main:
-            _text(fig, 666, 405, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
-            _aspect_rose(fig, 790, 370, 82, main["aspects"])
-            _altitude_mountain(fig, 878, 398, 68, 50, main["above_m"], main["below_m"])
+            _text(fig, 660, 412, PROBLEM_NAMES.get(main["type"], main["type"].replace("_", " ")), 13)
+            _aspect_rose(fig, 800, 393, 76, main["aspects"])
+            _altitude_mountain(fig, 886, 407, 58, 48, main["above_m"], main["below_m"])
             if main["above_m"] or main["below_m"]:
-                _text(fig, 912, 378, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
+                _text(fig, 915, 380, f"{main['above_m'] or main['below_m']} m", 12, weight="bold",
                       ha="center")
         until = datetime.fromisoformat(av["valid_to"].replace("Z", "+00:00")).astimezone(lf.TZ)
-        _text(fig, 666, 380, f"until {until:%a %H:%M}", 11, P["MUTED"])
+        _text(fig, 590, 380, f"until {until:%a %H:%M}", 12, P["MUTED"])
     else:
         _text(fig, 590, 412, "no bulletin", 15)
-        _text(fig, 590, 388, "none published now", 13, P["MUTED"])
+        _text(fig, 590, 380, "none published now", 12, P["MUTED"])
 
 
 def chalet(view):

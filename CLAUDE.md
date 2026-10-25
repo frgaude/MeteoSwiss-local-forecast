@@ -48,6 +48,10 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   `screens._daily`); the 6 half-day outlook was dropped on 23 Oct 2026.
 - Colour (notebooks) is for charts and icons only: numbers stay in the text
   colour on all screens.
+- E-paper greys kept light for the T5: danger level fills #eee–#777 with a
+  black figure (rounded, no frame), sunshine bars #aaaaaa. Avalanche block
+  rows match the other blocks: label 462, big figures on the 412 baseline
+  (pictograms centred on them), small text 380.
 - Display: LilyGO T5 4.7" e-paper V2.3 (ESP32-S3-WROOM-1 N16R8: 16 MB flash,
   8 MB PSRAM; ED047TC1 panel 960×540, 16 greys; driver LilyGo-EPD47,
   branch esp32s3). Panel is ~104×58 mm (~234 dpi), so screen text is never
