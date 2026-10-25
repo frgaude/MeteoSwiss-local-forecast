@@ -61,6 +61,15 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   Tested on the T5 23 Oct 2026: one log line per press, no double counts; hourly timer wakes sleep at
   once. `epd_poweroff()` between draws, `epd_poweroff_all()` only before
   deep sleep (it zeroes the driver's config register).
+- Brownouts on button wake (25 Oct 2026): ~1 wake in 4 reset (brownout or
+  full power loss, even on USB + battery), dying inside epd_init(), so the
+  board restarted and re-downloaded (~20 s). Cause: epd_init switching the
+  74HCT4094 power controls (power_disable, ep_stv, scan_direction) all at once
+  from the all-0 sleep state. Fix: `step_power_controls()` walks them one at a
+  time, 20 ms apart, before epd_init (0 brownouts in 12 wakes); config pins
+  (GPIO0/12/13) are also held through deep sleep. Serial prints ms stamps,
+  the reset reason, and the previous boot's last step (kept in RTC memory).
+  Schematic: LilyGo-EPD47 repo, schematic/T5-ePaper-S3-V2.3.pdf.
   Pages is public (and needs a public repo on a free plan).
 - Repo: https://github.com/frgaude/MeteoSwiss-local-forecast (public), Pages
   https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub

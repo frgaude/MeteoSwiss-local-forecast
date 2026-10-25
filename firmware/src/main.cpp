@@ -21,6 +21,7 @@
 #include <WiFiClientSecure.h>
 #include <driver/rtc_io.h>
 #include <esp_timer.h>
+#include <rom/rtc.h>
 #include <time.h>
 
 #include <atomic>
@@ -104,11 +105,27 @@ static bool fetch_all() {
   return all;
 }
 
+// Milliseconds since boot, to see where the time goes.
+// The last step is also kept in RTC memory, which survives a brownout reset
+// (not a power loss), so the next boot can tell where the previous one died.
+RTC_NOINIT_ATTR static char last_step[48];
+RTC_NOINIT_ATTR static uint32_t last_step_magic;
+const uint32_t STEP_MAGIC = 0x57e95afe;
+
+static void stamp(const char *what) {
+  snprintf(last_step, sizeof(last_step), "%lu ms %s", millis(), what);
+  last_step_magic = STEP_MAGIC;
+  Serial.printf("%6lu ms  %s\n", millis(), what);
+}
+
 static void draw() {
   epd_poweron();
+  stamp("panel powered on");
   epd_clear();  // full refresh every time: no ghosting from partial updates
+  stamp("cleared");
   epd_draw_grayscale_image(epd_full_screen(), fb);
   epd_poweroff();
+  stamp("drawn");
 }
 
 // Called every 10 ms by an esp_timer, which keeps running during a refresh.
@@ -155,6 +172,60 @@ static int switch_screens(int view) {
   return view;
 }
 
+// The panel's power rails (boost converter, +/- high voltage) are switched by
+// a 74HCT4094 shift register: data GPIO13, clock GPIO12, strobe GPIO0. The
+// strobe idles high (boot pin pull-up), which makes the outputs follow the
+// shift register, so an edge on the clock pin while the chip sleeps or wakes
+// shifts junk onto the power controls. Hold the pins through deep sleep,
+// and at boot close the latch (strobe low) before touching clock and data.
+static const gpio_num_t CFG_STR_PIN = GPIO_NUM_0, CFG_CLK_PIN = GPIO_NUM_12,
+                        CFG_DATA_PIN = GPIO_NUM_13;
+
+static void hold_cfg_pins() {
+  gpio_hold_en(CFG_STR_PIN);
+  gpio_hold_en(CFG_CLK_PIN);
+  gpio_hold_en(CFG_DATA_PIN);
+  gpio_deep_sleep_hold_en();
+}
+
+static void release_cfg_pins() {
+  gpio_set_level(CFG_STR_PIN, 0);
+  gpio_set_direction(CFG_STR_PIN, GPIO_MODE_OUTPUT);
+  gpio_hold_dis(CFG_STR_PIN);  // latch closed: clock edges no longer reach the outputs
+  gpio_set_level(CFG_CLK_PIN, 1);
+  gpio_set_level(CFG_DATA_PIN, 0);
+  gpio_set_direction(CFG_CLK_PIN, GPIO_MODE_OUTPUT);
+  gpio_set_direction(CFG_DATA_PIN, GPIO_MODE_OUTPUT);
+  gpio_hold_dis(CFG_CLK_PIN);
+  gpio_hold_dis(CFG_DATA_PIN);
+  gpio_deep_sleep_hold_dis();
+}
+
+// Bring the power-control register from its sleep state (all 0, left by
+// epd_poweroff_all) to the state epd_init sets, one output at a time with
+// 20 ms between steps, so epd_init then changes nothing. Switched all at once
+// by epd_init, the change browned out the board on about 1 button wake in 4;
+// stepped, 0 in 12 (tested 25 Oct 2026). Bit order as in the driver's push_cfg.
+static void step_power_controls() {
+  enum { OE, MODE, SCAN, STV, NEG, POS, PWR_DISABLE, LE };
+  bool cfg[8] = {};
+  auto push = [&]() {
+    gpio_set_level(CFG_STR_PIN, 0);
+    for (bool b : cfg) {
+      gpio_set_level(CFG_CLK_PIN, 0);
+      gpio_set_level(CFG_DATA_PIN, b);
+      gpio_set_level(CFG_CLK_PIN, 1);
+    }
+    gpio_set_level(CFG_STR_PIN, 1);
+    delay(20);
+  };
+  push();
+  for (int bit : {STV, SCAN, PWR_DISABLE}) {
+    cfg[bit] = true;
+    push();
+  }
+}
+
 // Seconds until the next HH:FETCH_MINUTE, from the clock set by NTP (it keeps
 // running in deep sleep). Swiss time is a whole number of hours from UTC.
 // A negative `min_wait` means "if HH:FETCH_MINUTE passed less than that
@@ -175,23 +246,45 @@ static void sleep_for(uint32_t seconds) {
     delay(10);  // wait for release, or the press would wake us straight away
   }
   epd_poweroff_all();
+  hold_cfg_pins();
   esp_sleep_enable_ext0_wakeup((gpio_num_t)BUTTON_1, 0);
   rtc_gpio_pullup_en((gpio_num_t)BUTTON_1);
   rtc_gpio_pulldown_dis((gpio_num_t)BUTTON_1);
   esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
   Serial.printf("sleeping %u s\n", seconds);
+  stamp("going to sleep");
   Serial.flush();
   esp_deep_sleep_start();
 }
 
 void setup() {
   Serial.begin(115200);
+  if (last_step_magic == STEP_MAGIC) {
+    last_step[sizeof(last_step) - 1] = 0;
+    Serial.printf("        previous boot's last step: %s\n", last_step);
+  } else {
+    Serial.println("        previous boot's last step: unknown (RTC memory lost)");
+  }
+  stamp(esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0    ? "boot: button"
+        : esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER ? "boot: timer"
+                                                                 : "boot: power on / reset");
+  static const char *REASONS[] = {"unknown", "power on", "external pin", "software", "panic",
+                                  "interrupt watchdog", "task watchdog", "other watchdog",
+                                  "deep sleep", "brownout", "SDIO"};
+  esp_reset_reason_t r = esp_reset_reason();
+  // the ROM code tells USB resets apart (21 = USB serial, 22 = USB JTAG)
+  Serial.printf("        reset reason: %s (%d), ROM code %d\n", r < 11 ? REASONS[r] : "?", r,
+                (int)rtc_get_reset_reason(0));
   fb = (uint8_t *)ps_malloc(FB_SIZE);
   if (!fb || !LittleFS.begin(true)) {
     Serial.println("no PSRAM or flash file system");
     sleep_for(RETRY_S);
   }
+  stamp("flash file system mounted");
+  release_cfg_pins();
+  step_power_controls();
   epd_init();
+  stamp("display initialised");
 
   Preferences prefs;
   prefs.begin("forecast");
@@ -214,7 +307,10 @@ void setup() {
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
   }
-  if (load(VIEWS[view])) draw();
+  if (load(VIEWS[view])) {
+    stamp("screen loaded");
+    draw();
+  }
   // someone is at the board (button, power on, reset): give them time to
   // switch screens; the hourly timer goes straight back to sleep
   if (cause != ESP_SLEEP_WAKEUP_TIMER) view = switch_screens(view);
