@@ -15,10 +15,10 @@ the small per-view JSON built by `notebooks/localforecast.py`, not raw CSVs
   the wind comes from, 16-point name + speed in the centre, no degrees), with
   gusts and Beaufort beside it.
   Each dial has a title and plain lines beside it: "Forecast" (gusts, rain
-  3 h, Beaufort) and, as a second dial, "Lutry port 23h01": measured wind at
+  3h in whole mm, 3h weather text wrapped on two lines) and, as a second dial, "Lutry port 23h01": measured wind at
   WindSpots station CHVD19 (Lutry - Port du Vieux-Stand,
-  api.windspots.org/mobile, km/h → kt) with gusts, water temperature, max gust
-  12 h; "no recent measurement" if older than 2 h or status not green. Replaced the
+  api.windspots.org/mobile, km/h → kt) with gusts, water temperature, max
+  gust 12h; "no recent measurement" if older than 2 h or status not green. Replaced the
   forecast "next 12 h" block (26 Oct 2026).
 - Chalet: like home without solar; estimated new snow, sunshine, daily outlook,
   SLF avalanche bulletin (danger level, problem, aspect compass, altitude).

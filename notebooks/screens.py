@@ -304,9 +304,10 @@ def boat(view):
             _text(fig, x, 430 - 25 * i, row, 14)
 
     _wind_dial(fig, 10, 352, 140, now["dir"], now["wind_kt"], "kt")
-    lines(165, "FORECAST", [f"gusts {now['gust_kt']:.0f} kt",
-                            f"rain 3 h {now['rain_3h_mm']:.1f} mm",
-                            f"Beaufort {_beaufort(now['wind_kt'])}"])
+    lines(165, "FORECAST", [f"gusts {now['gust_kt']:.0f} kt", f"rain 3h {now['rain_3h_mm']:.0f} mm"])
+    # weather over the 3 h, wrapped to stay clear of the second dial
+    for i, line in enumerate(textwrap.wrap(lf.icon_text(now["icon"]), 19)[:2]):
+        _text(fig, 165, 380 - 17 * i, line, 13)
 
     t = _times(h)
     m = view.get("measured")
@@ -314,16 +315,16 @@ def boat(view):
     stale = (not m or m["status"] != "green"
              or datetime.now(lf.TZ) - when > timedelta(hours=2))
     if stale:
-        lines(330, "LUTRY PORT", ["no recent measurement"]
+        lines(345, "LUTRY PORT", ["no recent measurement"]
               + ([f"last {when:%a %H}h{when:%M} · {m['status']}"] if m else []))
     else:
-        _wind_dial(fig, 330, 352, 140, m["dir"], m["wind_kt"], "kt")
+        _wind_dial(fig, 345, 352, 140, m["dir"], m["wind_kt"], "kt")
         rows = [f"gusts {m['gust_kt']:.0f} kt"]
         if m["water_c"] is not None:
             rows.append(f"water {m['water_c']:.1f}°")
         if m["gust_max_12h_kt"] is not None:
-            rows.append(f"max 12 h {m['gust_max_12h_kt']:.0f} kt · WindSpots")
-        lines(485, f"LUTRY PORT {when:%H}h{when:%M}", rows)
+            rows.append(f"max 12h {m['gust_max_12h_kt']:.0f} kt")
+        lines(500, f"LUTRY PORT {when:%H}h{when:%M}", rows)
     _icon(fig, now["icon"], W - 115, 365, 100)
     _text(fig, W - 120, 425, _deg(now['temp']), 26, weight="bold", ha="right")
 
