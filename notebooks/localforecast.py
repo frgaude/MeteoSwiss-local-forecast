@@ -254,7 +254,7 @@ def _days(hourly, daily, n, snow_cm=None):
             break
         day = {
             "date": d.isoformat(),
-            "icon": int(daily.at[d, "jp2000d0"]) if d in daily.index else None,
+            "icon": _i(daily.at[d, "jp2000d0"]) if d in daily.index else None,
             "tmin": _r(daily.at[d, "tre200pn"]) if d in daily.index else None,
             "tmax": _r(daily.at[d, "tre200px"]) if d in daily.index else None,
             "precip_mm": _r(hourly.loc[on, "rre150h0"].sum()),
@@ -262,7 +262,7 @@ def _days(hourly, daily, n, snow_cm=None):
         }
         if snow_cm is not None:
             day.update(snow_cm=_r(snow_cm[on].sum()),
-                       freezing_m=int(hourly.loc[on, "zprfr0hs"].median()))
+                       freezing_m=_i(hourly.loc[on, "zprfr0hs"].median()))
         out.append(day)
     return out
 
@@ -296,6 +296,12 @@ def _chart_window(hourly, hours):
 
 def _r(x, nd=1):
     return None if pd.isna(x) else round(float(x), nd)
+
+
+def _i(x):
+    """int, or None where the forecast has a gap (e.g. 3-hourly values before
+    the run time, today's daily pictogram in some runs)."""
+    return None if pd.isna(x) else int(x)
 
 
 # ---------------------------------------------------------------------------
@@ -332,14 +338,14 @@ def home_view(run, hourly, daily, point, pv, hours=39, days=5):
     snow = snow_fraction(nxt, point["alt"])
     return {
         "view": "home", "name": point["name"], "run": run_time(run).isoformat(),
-        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"])},
+        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": _i(now["jww003i0"])},
         "solar": {"kwp": pv["kwp"], **_solar_day(pv_kw, point)},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
             "rain_mm": [_r(v) for v in nxt["rre150h0"] * (1 - snow)],
             "snow_mm": [_r(v) for v in nxt["rre150h0"] * snow],
-            "prob": [int(v) for v in nxt["rp0003i0"]],
+            "prob": [_i(v) for v in nxt["rp0003i0"]],
         },
         "chart": chart,
         "days": _days(hourly, daily, days),
@@ -398,15 +404,15 @@ def boat_view(run, hourly, point, measured=None, hours=39):
     return {
         "view": "boat", "name": point["name"], "run": run_time(run).isoformat(),
         "now": {"time": now.name.isoformat(), "wind_kt": _r(now["fu3010h0"] * KMH_TO_KT),
-                "gust_kt": _r(now["fu3010h1"] * KMH_TO_KT), "dir": int(now["dkl010h0"]),
-                "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
+                "gust_kt": _r(now["fu3010h1"] * KMH_TO_KT), "dir": _i(now["dkl010h0"]),
+                "temp": _r(now["tre200h0"]), "icon": _i(now["jww003i0"]),
                 "rain_3h_mm": _r(now["rre003i0"])},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "wind_kt": kt("fu3010h0"), "wind_q10_kt": kt("fu3q10h0"), "wind_q90_kt": kt("fu3q90h0"),
             "gust_kt": kt("fu3010h1"), "gust_q90_kt": kt("fu3q90h1"),
-            "dir": [int(v) for v in nxt["dkl010h0"]],
-            "icon": [int(v) for v in nxt["jww003i0"]],
+            "dir": [_i(v) for v in nxt["dkl010h0"]],
+            "icon": [_i(v) for v in nxt["jww003i0"]],
         },
         "chart": chart,
         "measured": measured,
@@ -423,15 +429,15 @@ def chalet_view(run, hourly, daily, point, bulletin=None, station=None, hours=39
     now = _now_row(hourly)
     return {
         "view": "chalet", "name": point["name"], "alt": point["alt"], "run": run_time(run).isoformat(),
-        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
-                "freezing_m": int(now["zprfr0hs"])},
+        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": _i(now["jww003i0"]),
+                "freezing_m": _i(now["zprfr0hs"])},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
             "snow_cm": [_r(v) for v in snow_cm[nxt.index]],
             "rain_mm": [_r(v) for v in nxt["rre150h0"] * (1 - snow[nxt.index])],
-            "sun_min": [int(v) for v in nxt["sre000h0"]],
-            "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
+            "sun_min": [_i(v) for v in nxt["sre000h0"]],
+            "freezing_m": [_i(v) for v in nxt["zprfr0hs"]],
         },
         "chart": chart,
         "days": _days(hourly, daily, days, snow_cm),
@@ -488,18 +494,18 @@ def mountain_view(run, hourly, point, bulletin=None, station=None, hours=39):
     return {
         "view": "mountain", "name": point["name"], "alt": point["alt"],
         "run": run_time(run).isoformat(),
-        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": int(now["jww003i0"]),
+        "now": {"time": now.name.isoformat(), "temp": _r(now["tre200h0"]), "icon": _i(now["jww003i0"]),
                 "feels": _r(float(wind_chill(now["tre200h0"], now["fu3010h0"]))),
-                "freezing_m": int(now["zprfr0hs"])},
+                "freezing_m": _i(now["zprfr0hs"])},
         "hourly": {
             "time": [t.isoformat() for t in nxt.index],
             "temp": [_r(v) for v in nxt["tre200h0"]],
             "snow_cm": [_r(v) for v in snow_cm[nxt.index]],
             "rain_mm": [_r(v) for v in nxt["rre150h0"] * (1 - snow[nxt.index])],
             "wind_kmh": [_r(v) for v in nxt["fu3010h0"]],
-            "dir": [int(v) for v in nxt["dkl010h0"]],
-            "sun_min": [int(v) for v in nxt["sre000h0"]],
-            "freezing_m": [int(v) for v in nxt["zprfr0hs"]],
+            "dir": [_i(v) for v in nxt["dkl010h0"]],
+            "sun_min": [_i(v) for v in nxt["sre000h0"]],
+            "freezing_m": [_i(v) for v in nxt["zprfr0hs"]],
         },
         "chart": chart,
         "sun_events": sun_events(point["lat"], point["lon"], chart["start"], chart["end"]),

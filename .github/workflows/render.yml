@@ -35,22 +35,22 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt
       - name: Cache pictograms
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/local_forecast/icons
           key: icons-v1
       - run: python render.py site
         env:
           SLF_ACTIVE_AT: ${{ inputs.slf_active_at }}
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
