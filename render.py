@@ -8,7 +8,7 @@ Writes into site/ (published by GitHub Pages, see nas/publish.py):
     status.json   forecast run and render time
     index.html    previews
 
-Usage: python render.py [out_dir]
+Usage: python render.py [out_dir [run]]   (run YYYYMMDDHHMM: that run instead of the latest)
 """
 import json
 import os
@@ -43,12 +43,12 @@ def _optional(fetch, *args):
         return None
 
 
-def main(out):
+def main(out, run=None):
     os.makedirs(out, exist_ok=True)
     # one pass over each parameter CSV for all points
     params = sorted(set(lf.HOME_PARAMS) | set(lf.BOAT_PARAMS) | set(lf.CHALET_PARAMS)
                     | set(lf.MOUNTAIN_PARAMS))
-    run, data = lf.fetch([HOME, BOAT, CHALET, MOUNTAIN], params)
+    run, data = lf.fetch([HOME, BOAT, CHALET, MOUNTAIN], params, run)
     try:
         # a past time (ISO, UTC) shows the bulletin valid then, for testing the layout
         bulletin = lf.slf_bulletin(SLF_REGION, active_at=os.environ.get("SLF_ACTIVE_AT") or None)
@@ -90,4 +90,4 @@ Data: MeteoSwiss (OGD) and SLF.</p>
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "site")
+    main(sys.argv[1] if len(sys.argv) > 1 else "site", sys.argv[2] if len(sys.argv) > 2 else None)

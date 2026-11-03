@@ -134,9 +134,10 @@ def fetch(keys, params, run=None):
     """Forecast of `params` for points `keys` [(point_id, point_type_id), …].
 
     Returns (run, {key: (hourly, daily)}), hourly indexed by local time and
-    daily by calendar date. Downloads only what is not cached for this run."""
+    daily by calendar date. Downloads only what is not cached for this run;
+    a given `run` that is cached needs no request to MeteoSwiss at all."""
     keys = [(int(a), int(b)) for a, b in keys]
-    latest, urls = latest_run()
+    latest, urls = latest_run() if run is None else (None, None)
     run = run or latest
     run_dir = os.path.join(OUT_DIR, run)
     os.makedirs(run_dir, exist_ok=True)

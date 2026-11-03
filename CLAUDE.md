@@ -89,10 +89,12 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   show both); palettes are `screens.COLOUR` / `screens.GREY`.
 - Refresh: every 60 min, plus once on boot/reset. Full refresh each time.
   Runs are named by the hour and published 2–7 min past it (checked 22 Oct
-  2026): the NAS renders at :12, :37 and :52, the T5 fetches at :40. :37
-  (was :32 until 3 Nov 2026) so the measured wind is ~3 min old at the fetch
-  (WindSpots is fetched every round, never cached); a NAS round takes ~10 s
-  with the run cached, Pages deploys ~30 s after the push.
+  2026): the NAS renders at :12, :37 and :52 (forecast rounds: check
+  MeteoSwiss for a new run) and :02, :25, :45 (wind rounds, user's wish
+  3 Nov 2026: `render.py site <cached run>`, only WindSpots/SLF are fetched,
+  MeteoSwiss schedule unchanged); the T5 fetches at :40. :37 (was :32 until
+  3 Nov 2026) so the measured wind is ~3 min old at the fetch; a NAS round
+  takes ~10 s with the run cached, Pages deploys ~30 s after the push.
 - Rendering is server-side on the user's TrueNAS SCALE (24.10+): Custom App
   `nas/compose.yaml` (python:3.13-bookworm, user 568 "apps", HOME=/data,
   dataset holds the clone, `.venv-nas/` and the cache) runs `nas/publish.py`:
