@@ -86,7 +86,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   inspired by LilyGo-EPD-4-7-OWM-Weather-Display, but its code is
   "Copyright David Bird, all rights reserved" with no license: do not copy it.
 - `render(draw, view, colour=True)` gives the colour version (notebooks
-  show both); palettes are `screens.COLOUR` / `screens.GREY`.
+  show both); palettes are `screens.COLOUR` / `screens.GREY`. The site's
+  `<view>.png` is the colour version (user's choice, 3 Nov 2026); `.raw` stays grey.
 - Refresh: every 60 min, plus once on boot/reset. Full refresh each time.
   Runs are named by the hour and published 2–7 min past it (checked 22 Oct
   2026): the NAS renders at :12, :37 and :52 (forecast rounds: check

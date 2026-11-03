@@ -3,7 +3,7 @@
 Writes into site/ (published by GitHub Pages, see nas/publish.py):
 
     <view>.raw    259,200-byte 4-bit frame buffer the T5 downloads and shows
-    <view>.png    the same screen, for checking in a browser
+    <view>.png    the same screen in colour, for a browser
     <view>.json   the view payload
     status.json   forecast run and render time
     index.html    previews
@@ -66,10 +66,9 @@ def main(out, run=None):
         "mountain": (screens.mountain, lf.mountain_view(run, data[MOUNTAIN][0], lf.point_info(MOUNTAIN), bulletin, station)),
     }
     for name, (draw, view) in views.items():
-        img = screens.render(draw, view)
-        img.save(os.path.join(out, f"{name}.png"), optimize=True)
+        screens.render(draw, view, colour=True).save(os.path.join(out, f"{name}.png"), optimize=True)
         with open(os.path.join(out, f"{name}.raw"), "wb") as f:
-            f.write(screens.epd_buffer(img))
+            f.write(screens.epd_buffer(screens.render(draw, view)))
         with open(os.path.join(out, f"{name}.json"), "w", encoding="utf-8") as f:
             json.dump(view, f, ensure_ascii=False, separators=(",", ":"))
 
