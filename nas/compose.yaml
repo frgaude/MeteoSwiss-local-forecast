@@ -17,5 +17,7 @@ services:
       - sh
       - -c
       - |
-        [ -d /data/repo/.git ] || git clone https://github.com/frgaude/MeteoSwiss-local-forecast.git /data/repo
+        git config --global --add safe.directory /data/repo
+        [ -d /data/repo/.git ] || git clone https://github.com/frgaude/MeteoSwiss-local-forecast.git /data/repo \
+          || { echo "clone failed (network? dataset writable?), retrying in 10 min"; sleep 600; exit 1; }
         exec sh /data/repo/nas/start.sh
