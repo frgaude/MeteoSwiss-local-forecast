@@ -89,11 +89,16 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   show both); palettes are `screens.COLOUR` / `screens.GREY`.
 - Refresh: every 60 min, plus once on boot/reset. Full refresh each time.
   Runs are named by the hour and published 2–7 min past it (checked 22 Oct
-  2026): the workflow renders at :12, :32 and :52 (GitHub dropped most hourly
-  runs on 23 Oct 2026, so three tries an hour), the T5 fetches at :40 because GitHub
-  often starts scheduled jobs late.
-- Rendering is server-side: `render.py` → `site/` → GitHub Pages via
-  `.github/workflows/render.yml`. One T5: the PlatformIO project `firmware/` (`src/main.cpp`)
+  2026): the NAS renders at :12, :32 and :52 (kept from the GitHub Actions
+  days, when most scheduled runs were dropped), the T5 fetches at :40.
+- Rendering is server-side on the user's TrueNAS SCALE (24.10+): Custom App
+  `nas/compose.yaml` (python:3.13-bookworm, user 568 "apps", HOME=/data,
+  dataset holds the clone, `.venv-nas/` and the cache) runs `nas/publish.py`:
+  pull main, `render.py` → `site/`, force-push `site/` as one orphan commit
+  to `gh-pages` (token via GIT_CONFIG_* env, never on the command line: an
+  error message once leaked it). First NAS publish 3 Nov 2026; the Actions
+  workflow was deleted then (GitHub dropped most of its scheduled runs).
+  One T5: the PlatformIO project `firmware/` (`src/main.cpp`)
   downloads all four `<view>.raw` into LittleFS each hour; the button
   (BUTTON_1 = GPIO21, ext0 wake) cycles home → boat → chalet → mountain from flash with
   no Wi-Fi. Current view is kept in NVS (Preferences). After a button wake or power
@@ -124,8 +129,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
   ghosting seen on the panel (25 Oct 2026), ~0.9 s faster.
   Pages is public (and needs a public repo on a free plan).
 - Repo: https://github.com/frgaude/MeteoSwiss-local-forecast (public), Pages
-  https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: GitHub
-  Actions). First workflow run succeeded on 23 Oct 2026 in ~1 min.
+  https://frgaude.github.io/MeteoSwiss-local-forecast/ (Source: branch
+  `gh-pages`, `/`, since 3 Nov 2026; GitHub Actions before).
 
 - Firmware builds with PlatformIO (`~/.platformio/penv/Scripts/pio.exe run`
   in `firmware/`): espressif32@6.12.0 (Arduino core 2.0.x), LilyGO's
