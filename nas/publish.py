@@ -11,7 +11,8 @@ publishes each run 2–7 min past the hour; the T5 fetches at :40). Each round:
 
 A failed round is logged and the next one tries again. GITHUB_TOKEN (a
 fine-grained token with Contents read/write on this repository) authorises
-the push; without it git uses its own credentials.
+the push; without it git uses its own credentials. The pull needs none (the
+repository is public).
 
 Usage: python nas/publish.py [--once]
 """
@@ -35,13 +36,17 @@ def log(msg):
     print(f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S}Z {msg}", flush=True)
 
 
-def git(*args, cwd=REPO):
+def git(*args, cwd=REPO, auth=False):
+    """Run git; never prompt (fail instead). With `auth`, send GITHUB_TOKEN as
+    a header set through the environment, so the token is in neither the
+    command line nor an error message (which repeats the command)."""
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     token = os.environ.get("GITHUB_TOKEN")
-    auth = []
-    if token:   # a header, so the token never shows in a remote URL or an error message
+    if auth and token:
         basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
-        auth = ["-c", f"http.extraHeader=Authorization: Basic {basic}"]
-    subprocess.run(["git", *auth, *args], cwd=cwd, check=True)
+        env.update(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="http.extraHeader",
+                   GIT_CONFIG_VALUE_0=f"Authorization: Basic {basic}")
+    subprocess.run(["git", *args], cwd=cwd, env=env, check=True)
 
 
 def next_round(now):
@@ -72,7 +77,7 @@ def publish():
     git("add", "-A", cwd=SITE)
     git("-c", "user.name=NAS render", "-c", "user.email=nas@localhost",
         "commit", "-q", "-m", f"Render {datetime.now(timezone.utc):%Y-%m-%d %H:%M}Z", cwd=SITE)
-    git("push", "-q", "--force", REMOTE, "gh-pages", cwd=SITE)
+    git("push", "-q", "--force", REMOTE, "gh-pages", cwd=SITE, auth=True)
     prune_cache()
 
 
