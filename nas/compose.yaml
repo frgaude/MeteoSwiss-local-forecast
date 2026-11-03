@@ -1,0 +1,21 @@
+# TrueNAS SCALE 24.10+: Apps → Discover Apps → ⋮ → Install via YAML, paste
+# this, and set the two values marked CHANGE. See "On the NAS" in README.md.
+#
+# The container clones the repository into the dataset on first start, then
+# nas/start.sh installs the Python packages into a venv there and runs
+# nas/publish.py, which renders at :12, :32 and :52 and pushes to gh-pages.
+services:
+  render:
+    image: python:3.13-bookworm          # has git; the slim image does not
+    restart: unless-stopped
+    environment:
+      GITHUB_TOKEN: "github_pat_..."     # CHANGE: fine-grained token, this repo, Contents read/write
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - /mnt/tank/apps/forecast:/data    # CHANGE: your dataset
+    command:
+      - sh
+      - -c
+      - |
+        [ -d /data/repo/.git ] || git clone https://github.com/frgaude/MeteoSwiss-local-forecast.git /data/repo
+        exec sh /data/repo/nas/start.sh

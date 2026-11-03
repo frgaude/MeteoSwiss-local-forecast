@@ -1,6 +1,6 @@
 """Render the home, boat, chalet and mountain screens for the LilyGO T5 4.7" e-paper.
 
-Writes into site/ (published by GitHub Pages, see .github/workflows/render.yml):
+Writes into site/ (published by GitHub Pages, see nas/publish.py):
 
     <view>.raw    259,200-byte 4-bit frame buffer the T5 downloads and shows
     <view>.png    the same screen, for checking in a browser

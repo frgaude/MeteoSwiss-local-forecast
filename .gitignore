@@ -3,6 +3,7 @@ data/
 __pycache__/
 *.pyc
 .venv/
+.venv-nas/
 .ipynb_checkpoints/
 
 # Rendered screens (published by the workflow)

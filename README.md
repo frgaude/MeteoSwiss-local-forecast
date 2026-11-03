@@ -30,18 +30,20 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 
 ## On the e-paper
 
-    GitHub Actions (:12, :32, :52)        LilyGO T5 (wakes at :40, on reset, on button)
-    render.py → site/*.raw, *.png  ──►  GitHub Pages  ──►  download all 3 to flash
-                                                            show one, deep sleep
+    NAS container (:12, :32, :52)         LilyGO T5 (wakes at :40, on reset, on button)
+    render.py → site/*.raw, *.png  ──►  GitHub Pages  ──►  download all 4 to flash
+    push to gh-pages                                        show one, deep sleep
 
 - `render.py` fetches the three points in one pass, renders the screens and
   writes `site/` (`<view>.raw` for the panel, `<view>.png` and `index.html` to
   check in a browser, `status.json` with the forecast run). Its configuration
   block repeats the notebooks' point ids.
-- `.github/workflows/render.yml` runs it at :12, :32 and :52 (MeteoSwiss
-  publishes 2–7 min past the hour; GitHub often drops scheduled runs, hence
-  three an hour) and deploys `site/` to GitHub Pages. In the
-  repository settings, set Pages → Source to "GitHub Actions".
+- `nas/publish.py` runs it on the NAS at :12, :32 and :52 (MeteoSwiss
+  publishes 2–7 min past the hour; the T5 fetches at :40) and force-pushes
+  `site/` as a single commit to the `gh-pages` branch, which Pages serves
+  (Settings → Pages → Source: "Deploy from a branch", `gh-pages`, `/ (root)`).
+  See "On the NAS" below. It replaced a scheduled GitHub Actions workflow,
+  because GitHub dropped most of its scheduled runs.
 - `firmware/` is a PlatformIO project (`src/main.cpp`). Each hourly wake
   (and power on / reset) downloads all four screens into flash and shows the
   current one; the button (GPIO21) wakes the board and shows the next screen
@@ -54,8 +56,32 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
   `platformio.ini`.
 
 GitHub Pages sites are public, so the screens (place names, forecasts) can be
-seen by anyone with the address. GitHub can start scheduled jobs late under
-load and pauses them in repositories with no activity for 60 days.
+seen by anyone with the address.
+
+## On the NAS (TrueNAS SCALE 24.10+)
+
+A Custom App (one Docker container, `nas/compose.yaml`) renders and publishes:
+
+1. **Dataset**: create one, e.g. `tank/apps/forecast` (Datasets → Add, preset
+   Apps). It holds a clone of this repository, the Python venv and the
+   forecast cache (runs older than 7 days are deleted).
+2. **Token**: on GitHub, Settings → Developer settings → Fine-grained tokens →
+   Generate: repository access "Only select repositories" → this one,
+   permission Contents: Read and write. Note the expiry date and renew it
+   before then (the push fails once it has expired).
+3. **App**: Apps → Discover Apps → ⋮ → Install via YAML, name it `forecast`,
+   paste `nas/compose.yaml`, then set the token and the dataset path
+   (`/mnt/<pool>/<dataset>`).
+
+On start the container clones the repository into the dataset (first time
+only), pulls `main`, installs `requirements.txt` into `.venv-nas/`, renders
+once, then again at :12, :32 and :52. Each round pulls `main` first, so code
+pushed to GitHub is used from the next round; restart the app after changing
+`requirements.txt`. Logs: Apps → forecast → Workloads → logs (one
+"published" or "failed" line per round, plus the render output).
+
+To try it on a PC: `python nas/publish.py --once` (pushes with git's own
+credentials when `GITHUB_TOKEN` is not set).
 
 ## Notes
 

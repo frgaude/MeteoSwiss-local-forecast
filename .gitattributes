@@ -1,0 +1,2 @@
+# the NAS container runs these with sh
+*.sh text eol=lf
