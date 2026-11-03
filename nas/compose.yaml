@@ -8,8 +8,10 @@ services:
   render:
     image: python:3.13-bookworm          # has git; the slim image does not
     restart: unless-stopped
+    user: "568:568"                      # TrueNAS's "apps" user; the dataset must belong to it
     environment:
       GITHUB_TOKEN: "github_pat_..."     # CHANGE: fine-grained token, this repo, Contents read/write
+      HOME: /data                        # git settings and matplotlib's cache (568 has no home)
       PYTHONUNBUFFERED: "1"
     volumes:
       - /mnt/tank/apps/forecast:/data    # CHANGE: your dataset

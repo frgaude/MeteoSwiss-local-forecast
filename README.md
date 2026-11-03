@@ -64,7 +64,11 @@ A Custom App (one Docker container, `nas/compose.yaml`) renders and publishes:
 
 1. **Dataset**: create one, e.g. `tank/apps/forecast` (Datasets → Add, preset
    Apps). It holds a clone of this repository, the Python venv and the
-   forecast cache (runs older than 7 days are deleted).
+   forecast cache (runs older than 7 days are deleted). The container runs
+   as the `apps` user (568), so the dataset and everything in it must belong
+   to `apps`: the Apps preset does that for a new dataset; for one used
+   before, set the owner to `apps` with "Apply recursively" (Datasets → Edit
+   Permissions), or empty it.
 2. **Token**: on GitHub, Settings → Developer settings → Fine-grained tokens →
    Generate: repository access "Only select repositories" → this one,
    permission Contents: Read and write. Note the expiry date and renew it
