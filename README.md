@@ -30,7 +30,7 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 
 ## On the e-paper
 
-    NAS container (:12, :32, :52)         LilyGO T5 (wakes at :40, on reset, on button)
+    NAS container (:12, :37, :52)         LilyGO T5 (wakes at :40, on reset, on button)
     render.py → site/*.raw, *.png  ──►  GitHub Pages  ──►  download all 4 to flash
     push to gh-pages                                        show one, deep sleep
 
@@ -38,8 +38,9 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
   writes `site/` (`<view>.raw` for the panel, `<view>.png` and `index.html` to
   check in a browser, `status.json` with the forecast run). Its configuration
   block repeats the notebooks' point ids.
-- `nas/publish.py` runs it on the NAS at :12, :32 and :52 (MeteoSwiss
-  publishes 2–7 min past the hour; the T5 fetches at :40) and force-pushes
+- `nas/publish.py` runs it on the NAS at :12, :37 and :52 (MeteoSwiss
+  publishes 2–7 min past the hour; the T5 fetches at :40, so :37 gives it
+  the freshest measured wind and retries a failed :12) and force-pushes
   `site/` as a single commit to the `gh-pages` branch, which Pages serves
   (Settings → Pages → Source: "Deploy from a branch", `gh-pages`, `/ (root)`).
   See "On the NAS" below. It replaced a scheduled GitHub Actions workflow,
@@ -79,7 +80,7 @@ A Custom App (one Docker container, `nas/compose.yaml`) renders and publishes:
 
 On start the container clones the repository into the dataset (first time
 only), pulls `main`, installs `requirements.txt` into `.venv-nas/`, renders
-once, then again at :12, :32 and :52. Each round pulls `main` first, so code
+once, then again at :12, :37 and :52. Each round pulls `main` first, so code
 pushed to GitHub is used from the next round; restart the app after changing
 `requirements.txt`. Logs: Apps → forecast → Workloads → logs (one
 "published" or "failed" line per round, plus the render output).

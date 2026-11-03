@@ -1,7 +1,9 @@
 """Render the screens on the NAS and publish them on GitHub Pages.
 
-Runs in the container of nas/compose.yaml, at :12, :32 and :52 (MeteoSwiss
-publishes each run 2–7 min past the hour; the T5 fetches at :40). Each round:
+Runs in the container of nas/compose.yaml, at :12, :37 and :52. MeteoSwiss
+publishes each run 2–7 min past the hour; the T5 fetches at :40, so :37 gives
+it the freshest measured wind (WindSpots, fetched every round) with time for
+the push and the Pages deployment (~30 s), and retries a failed :12. Each round:
 
 1. pull main, so code changes go live without touching the NAS
 2. render.py → site/
@@ -28,7 +30,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = os.path.join(REPO, "site")
 CACHE = os.path.join(REPO, "data", "local_forecast")
 REMOTE = "https://github.com/frgaude/MeteoSwiss-local-forecast.git"
-MINUTES = (12, 32, 52)
+MINUTES = (12, 37, 52)
 KEEP_DAYS = 7             # forecast runs kept in the cache (~9 MB a day)
 
 
@@ -50,7 +52,7 @@ def git(*args, cwd=REPO, auth=False):
 
 
 def next_round(now):
-    """The next :12, :32 or :52 after `now`."""
+    """The next round (MINUTES past the hour) after `now`."""
     for m in MINUTES:
         t = now.replace(minute=m, second=0, microsecond=0)
         if t > now:
