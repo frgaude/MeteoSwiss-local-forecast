@@ -18,9 +18,13 @@ fine-grained token with Contents read/write on this repository) authorises
 the push; without it git uses its own credentials. The pull needs none (the
 repository is public).
 
-Usage: python nas/publish.py [--once]
+The loop itself is this file, loaded once: when a pull changes it, it
+restarts itself (render.py runs as a new process each round anyway).
+
+Usage: python nas/publish.py [--once | --wait]   (--wait: no round on start)
 """
 import base64
+import hashlib
 import os
 import shutil
 import subprocess
@@ -28,7 +32,8 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SELF = os.path.abspath(__file__)
+REPO = os.path.dirname(os.path.dirname(SELF))
 SITE = os.path.join(REPO, "site")
 CACHE = os.path.join(REPO, "data", "local_forecast")
 REMOTE = "https://github.com/frgaude/MeteoSwiss-local-forecast.git"
@@ -99,9 +104,19 @@ def publish(forecast):
     prune_cache()
 
 
-def main(once):
+def _digest():
+    with open(SELF, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def main(once, wait=False):
+    loaded = _digest()
     forecast = True                             # the first round, on start
     while True:
+        if wait:
+            wake, forecast = next_round(datetime.now(timezone.utc))
+            time.sleep(max(0, (wake - datetime.now(timezone.utc)).total_seconds()))
+        wait = True
         try:
             publish(forecast)
             log("published" if forecast else "published (wind round)")
@@ -109,9 +124,10 @@ def main(once):
             log(f"failed: {e}")
         if once:
             return
-        wake, forecast = next_round(datetime.now(timezone.utc))
-        time.sleep(max(0, (wake - datetime.now(timezone.utc)).total_seconds()))
+        if _digest() != loaded:                 # the pull brought a new version of this loop
+            log("nas/publish.py changed, restarting it")
+            os.execv(sys.executable, [sys.executable, SELF, "--wait"])
 
 
 if __name__ == "__main__":
-    main("--once" in sys.argv)
+    main("--once" in sys.argv, wait="--wait" in sys.argv)

@@ -98,7 +98,8 @@ Describe all data as forecasts (e.g. "forecast for now", not "current").
 - Rendering is server-side on the user's TrueNAS SCALE (24.10+): Custom App
   `nas/compose.yaml` (python:3.13-bookworm, user 568 "apps", HOME=/data,
   dataset holds the clone, `.venv-nas/` and the cache) runs `nas/publish.py`:
-  pull main, `render.py` → `site/`, force-push `site/` as one orphan commit
+  pull main (it re-execs itself when the pull changes publish.py; render.py
+  is a new process each round), `render.py` → `site/`, force-push `site/` as one orphan commit
   to `gh-pages` (token via GIT_CONFIG_* env, never on the command line: an
   error message once leaked it). First NAS publish 3 Nov 2026; the Actions
   workflow was deleted then (GitHub dropped most of its scheduled runs).
