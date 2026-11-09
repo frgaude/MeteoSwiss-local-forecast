@@ -1,20 +1,20 @@
 """Render the screens on the NAS and publish them on GitHub Pages.
 
-Runs in the container of nas/compose.yaml. Forecast rounds at :12, :37 and
-:52 also check MeteoSwiss for a new run (published 2–7 min past the hour);
-wind rounds at :02, :25 and :45 re-render the newest cached run, so only the
-measurements (WindSpots, SLF) are new and MeteoSwiss is not contacted. The T5
-fetches at :40: :37 gives it the freshest measured wind with time for the push
-and the Pages deployment (~30 s), and retries a failed :12. Each round:
+Runs in the container of nas/compose.yaml. One round every 3 hours, at :37
+of 00, 03, 06, ... 21 Swiss time (user's choice, 9 Nov 2026: fewer Pages
+deployments, after GitHub's Pages service got stuck on one). MeteoSwiss
+publishes each hourly run 2–7 min past the hour; the T5 still fetches every
+hour at :40 and gets the same files in between. A failed round is retried
+once at :52 of the same hour. Each round:
 
 1. pull main, so code changes go live without touching the NAS
-2. render.py → site/ (with the cached run in a wind round)
+2. render.py → site/ (checks MeteoSwiss for a new run, fetches WindSpots and SLF)
 3. force-push site/ as a single commit to the gh-pages branch, which Pages
    serves at https://frgaude.github.io/MeteoSwiss-local-forecast/ (one commit,
    so the repository does not grow by ~1.5 MB an hour)
 
-A failed round is logged and the next one tries again. GITHUB_TOKEN (a
-fine-grained token with Contents read/write on this repository) authorises
+A failed round is logged; after the retry, the next round tries again.
+GITHUB_TOKEN (a fine-grained token with Contents read/write on this repository) authorises
 the push; without it git uses its own credentials. The pull needs none (the
 repository is public).
 
@@ -31,14 +31,17 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 SELF = os.path.abspath(__file__)
 REPO = os.path.dirname(os.path.dirname(SELF))
 SITE = os.path.join(REPO, "site")
 CACHE = os.path.join(REPO, "data", "local_forecast")
 REMOTE = "https://github.com/frgaude/MeteoSwiss-local-forecast.git"
-FORECAST_MINUTES = (12, 37, 52)   # also check MeteoSwiss for a new run
-WIND_MINUTES = (2, 25, 45)        # newest cached run, fresh measurements only
+TZ = ZoneInfo("Europe/Zurich")
+EVERY_HOURS = 3           # a round at :ROUND_MINUTE of every 3rd local hour (00, 03, ...)
+ROUND_MINUTE = 37         # just before the T5 fetches at :40
+RETRY_MINUTE = 52         # one retry in the same hour after a failed round
 KEEP_DAYS = 7             # forecast runs kept in the cache (~9 MB a day)
 
 
@@ -60,24 +63,16 @@ def git(*args, cwd=REPO, auth=False):
 
 
 def next_round(now):
-    """(time, forecast) of the next round after `now`; `forecast` is True for
-    a forecast round."""
-    minutes = sorted(FORECAST_MINUTES + WIND_MINUTES)
-    for m in minutes:
-        t = now.replace(minute=m, second=0, microsecond=0)
-        if t > now:
-            return t, m in FORECAST_MINUTES
-    t = now.replace(minute=minutes[0], second=0, microsecond=0) + timedelta(hours=1)
-    return t, minutes[0] in FORECAST_MINUTES
+    """The next round after `now`: :ROUND_MINUTE of the next local hour that
+    is a multiple of EVERY_HOURS."""
+    t = now.astimezone(TZ).replace(minute=ROUND_MINUTE, second=0, microsecond=0)
+    while t <= now or t.hour % EVERY_HOURS:
+        t += timedelta(hours=1)
+    return t
 
 
-def cached_run():
-    """The newest run in the cache (its points.json is written once its
-    downloads are complete), or None."""
-    if not os.path.isdir(CACHE):
-        return None
-    return max((n for n in os.listdir(CACHE) if len(n) == 12 and n.isdigit()
-                and os.path.exists(os.path.join(CACHE, n, "points.json"))), default=None)
+def sleep_until(t):
+    time.sleep(max(0, (t - datetime.now(timezone.utc)).total_seconds()))
 
 
 def prune_cache():
@@ -90,11 +85,10 @@ def prune_cache():
             shutil.rmtree(os.path.join(CACHE, name), ignore_errors=True)
 
 
-def publish(forecast):
+def publish():
     git("pull", "--ff-only", "-q")
     shutil.rmtree(SITE, ignore_errors=True)
-    run = None if forecast else cached_run()    # no cache yet: a forecast round after all
-    subprocess.run([sys.executable, "render.py", "site", *([run] if run else [])], cwd=REPO, check=True)
+    subprocess.run([sys.executable, "render.py", "site"], cwd=REPO, check=True)
     open(os.path.join(SITE, ".nojekyll"), "w").close()   # serve the files as they are
     git("init", "-q", "-b", "gh-pages", cwd=SITE)
     git("add", "-A", cwd=SITE)
@@ -111,17 +105,21 @@ def _digest():
 
 def main(once, wait=False):
     loaded = _digest()
-    forecast = True                             # the first round, on start
     while True:
         if wait:
-            wake, forecast = next_round(datetime.now(timezone.utc))
-            time.sleep(max(0, (wake - datetime.now(timezone.utc)).total_seconds()))
+            sleep_until(next_round(datetime.now(timezone.utc)))
         wait = True
-        try:
-            publish(forecast)
-            log("published" if forecast else "published (wind round)")
-        except Exception as e:
-            log(f"failed: {e}")
+        for attempt in (1, 2):
+            try:
+                publish()
+                log("published")
+                break
+            except Exception as e:
+                log(f"failed: {e}")
+                retry = datetime.now(TZ).replace(minute=RETRY_MINUTE, second=0, microsecond=0)
+                if once or attempt == 2 or retry <= datetime.now(timezone.utc):
+                    break
+                sleep_until(retry)
         if once:
             return
         if _digest() != loaded:                 # the pull brought a new version of this loop

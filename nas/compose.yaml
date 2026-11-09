@@ -3,7 +3,7 @@
 #
 # The container clones the repository into the dataset on first start, then
 # nas/start.sh installs the Python packages into a venv there and runs
-# nas/publish.py, which renders every ~10 min and pushes to gh-pages.
+# nas/publish.py, which renders every 3 hours and pushes to gh-pages.
 services:
   render:
     image: python:3.13-bookworm          # has git; the slim image does not

@@ -32,7 +32,7 @@
 
 const char *VIEWS[] = {"home", "boat", "chalet", "mountain"};
 const int N_VIEWS = sizeof(VIEWS) / sizeof(VIEWS[0]);
-const int FETCH_MINUTE = 40;  // render job runs at :12 and :32, GitHub may delay it
+const int FETCH_MINUTE = 40;  // the NAS publishes at :37 every 3 h
 const int RETRY_S = 10 * 60;
 const uint32_t AWAKE_MS = 20000;  // stay awake after the last button press
 // Black/white clear cycles before drawing: full on the hourly update (nobody

@@ -30,7 +30,7 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
 
 ## On the e-paper
 
-    NAS container (every ~10 min)         LilyGO T5 (wakes at :40, on reset, on button)
+    NAS container (every 3 h)             LilyGO T5 (wakes at :40, on reset, on button)
     render.py → site/*.raw, *.png  ──►  GitHub Pages  ──►  download all 4 to flash
     push to gh-pages                                        show one, deep sleep
 
@@ -38,12 +38,10 @@ Then open the notebooks in VS Code or Jupyter and edit the configuration cell
   writes `site/` (`<view>.raw` for the panel, `<view>.png` and `index.html` to
   check in a browser, `status.json` with the forecast run). Its configuration
   block repeats the notebooks' point ids.
-- `nas/publish.py` runs it on the NAS: forecast rounds at :12, :37 and :52
-  check MeteoSwiss for a new run (published 2–7 min past the hour); wind
-  rounds at :02, :25 and :45 re-render the cached run with fresh
-  measurements (WindSpots, SLF) and do not contact MeteoSwiss. The T5
-  fetches at :40, so :37 gives it the freshest measured wind and retries a
-  failed :12. Each round force-pushes
+- `nas/publish.py` runs it on the NAS once every 3 hours, at :37 of 00, 03,
+  06, ... 21 Swiss time (a failed round is retried at :52), just before the
+  T5 fetches at :40; the T5's other hourly fetches get the same files.
+  Each round force-pushes
   `site/` as a single commit to the `gh-pages` branch, which Pages serves
   (Settings → Pages → Source: "Deploy from a branch", `gh-pages`, `/ (root)`).
   See "On the NAS" below. It replaced a scheduled GitHub Actions workflow,
@@ -83,7 +81,7 @@ A Custom App (one Docker container, `nas/compose.yaml`) renders and publishes:
 
 On start the container clones the repository into the dataset (first time
 only), pulls `main`, installs `requirements.txt` into `.venv-nas/`, renders
-once, then at :02, :12, :25, :37, :45 and :52. Each round pulls `main` first, so code
+once, then at :37 every 3 hours (00, 03, ... 21 Swiss time). Each round pulls `main` first, so code
 pushed to GitHub is used from the next round; restart the app after changing
 `requirements.txt`. Logs: Apps → forecast → Workloads → logs (one
 "published" or "failed" line per round, plus the render output).
